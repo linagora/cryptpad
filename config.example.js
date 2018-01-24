@@ -45,16 +45,16 @@ module.exports = {
         // IE/Edge
         "frame-src blob: *",
 
-        "media-src * blob:",
+        "media-src * http: blob:",
 
         /*  this allows connections over secure or insecure websockets
             if you are deploying to production, you'll probably want to remove
             the ws://* directive, and change '*' to your domain
          */
-        "connect-src 'self' ws: wss: blob:" + domain,
+        "connect-src * http: ws: wss: blob:" + domain,
 
         // data: is used by codemirror
-        "img-src 'self' data: blob:" + domain,
+        "img-src * http: data: blob:" + domain,
 
         // for accounts.cryptpad.fr authentication and pad2 cross-domain iframe sandbox
         "frame-ancestors *",
@@ -315,4 +315,9 @@ module.exports = {
      * user identity to the client.
      */
     //delegatedIdentityManagement: true,
+
+    /* Base uri for accessing OpenPaas API */
+    //openpaasAPIBaseUri: 'http://openpaas.local/api',
+};
+
 };
