@@ -308,4 +308,11 @@ module.exports = {
     //  '/etc/apache2/ssl/my_public_cert.crt',
     //  '/etc/apache2/ssl/my_certificate_authorities_cert_chain.ca'
     //],
+
+    /**
+     * Identity Management can be delegated to an external server (SSO).
+     * In that case, an API endpoint /api/me is exposed to provide
+     * user identity to the client.
+     */
+    //delegatedIdentityManagement: true,
 };
