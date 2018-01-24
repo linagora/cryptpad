@@ -825,5 +825,13 @@ define(function () {
     out.share_embedCategory = "Intégration";
     out.share_mediatagCopy = "Copier le mediatag";
 
+    // OpenPaaS Share related
+    out.share_openpaasCategory = "Avec OpenPaaS";
+    out.share_openpaasLink = "Partager par email";
+    out.share_openpaasEmailSubject = "Accès à mon document";
+    out.share_openpaasEmailContent = "Bonjour,\n\nJ'ai partagé un document avec vous :\n\n{0}\n\n{1}\n\nCordialement";
+    out.share_openpaasEditRightsNote = "Vous pouvez modifier ce document en ligne.";
+    out.share_openpaasReadOnlyRightsNote = "Vous pouvez consulter ce document en ligne.";
+
     return out;
 });

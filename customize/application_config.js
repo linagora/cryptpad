@@ -24,6 +24,20 @@ define([
       callback();
     }
   };
+  
+  if (ServerConfig.openpaasEmailShareUrl) {
+    AppConfig.customizeShareOptions = function () {};
+    require([
+      '/customize/custom-share.js'
+    ], function (CustomShare) {
+      // let's add a new tab in the share modal
+      AppConfig.customizeShareOptions = function(hashes, tabs, padConfig) {
+        CustomShare.getTab(ServerConfig.openpaasEmailShareUrl, hashes, padConfig, function(newTab) {
+          tabs.splice(0, 0, newTab);
+        });
+      }
+    });  
+  }
 
   AppConfig.getAvatarUri = function(accountName) {
     return ServerConfig.openpaasAPIBaseUri + '/avatars?email=' + encodeURIComponent(accountName);

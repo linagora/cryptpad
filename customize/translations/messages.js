@@ -859,6 +859,14 @@ define(function () {
     out.share_linkCopy = "Copy to clipboard";
     out.share_embedCategory = "Embed";
     out.share_mediatagCopy = "Copy mediatag to clipboard";
+    
+    // OpenPaaS Share related
+    out.share_openpaasCategory = "With OpenPaaS";
+    out.share_openpaasLink = "Share by Email";
+    out.share_openpaasEmailSubject = "Access to my pad";
+    out.share_openpaasEmailContent = "Hello,\n\nI shared a pad with you:\n\n{0}\n\n{1}\n\nRegards";
+    out.share_openpaasEditRightsNote = "You have the right to collaborate on this pad.";
+    out.share_openpaasReadOnlyRightsNote = "You will be able to read this pad.";
 
     return out;
 });

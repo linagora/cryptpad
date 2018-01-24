@@ -318,6 +318,11 @@ module.exports = {
 
     /* Base uri for accessing OpenPaas API */
     //openpaasAPIBaseUri: 'http://openpaas.local/api',
-};
+
+    /** This param can be used to add a "Share by email" entry
+     *  in the Share modal of a pad. It will open an OpenPaaS
+     *  email composer allowing to send the pad URL to any OpenPaaS user.
+     */
+    //openpaasEmailShareUrl: 'http://openpaas.local' + '/#/unifiedinbox/compose?mailto=',
 
 };
