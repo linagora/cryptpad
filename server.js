@@ -147,6 +147,7 @@ app.get('/api/config', function(req, res){
             },
             removeDonateButton: (config.removeDonateButton === true),
             allowSubscriptions: (config.allowSubscriptions === true),
+            delegatedIdentityManagement: (config.delegatedIdentityManagement === true),
             websocketPath: config.useExternalWebsocket ? undefined : config.websocketPath,
             websocketURL:'ws' + ((useSecureWebsockets) ? 's' : '') + '://' + host + ':' +
                 websocketPort + '/cryptpad_websocket',
@@ -163,6 +164,26 @@ app.get('/api/config', function(req, res){
         '});'
     ].join(';\n'));
 });
+
+if (config.delegatedIdentityManagement) {
+    app.get('/api/me', function(req, res, next){
+        if (req.headers) {
+            res.setHeader('Content-Type', 'text/javascript');
+            res.send('define(function(){\n' + [
+                'var obj = ' + JSON.stringify({
+                    email: req.headers.email,
+                    fullname: req.headers.fullname,
+                    pkey: req.headers.pkey,
+                }, null, '\t'),
+                'return obj',
+                '});'
+            ].join(';\n'));
+        } else {
+            next();
+        }
+    });
+}
+
 
 var four04_path = Path.resolve(__dirname + '/customize.dist/404.html');
 var custom_four04_path = Path.resolve(__dirname + '/customize/404.html');
