@@ -151,6 +151,7 @@ app.get('/api/config', function(req, res){
             websocketPath: config.useExternalWebsocket ? undefined : config.websocketPath,
             websocketURL:'ws' + ((useSecureWebsockets) ? 's' : '') + '://' + host + ':' +
                 websocketPort + '/cryptpad_websocket',
+            openpaasAPIBaseUri: config.openpaasAPIBaseUri,
         }, null, '\t'),
         'obj.httpSafeOrigin = ' + (function () {
             if (config.httpSafeOrigin) { return config.httpSafeOrigin; }

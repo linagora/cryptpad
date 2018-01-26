@@ -6,14 +6,17 @@
    but you should not change it directly (/common/application_config_internal.js)
 */
 define([
-  '/common/application_config_internal.js',
-  '/customize/authentication-provider.js',
-  '/api/config'
-], function (AppConfig, AuthenticationProvider, ServerConfig) {
-  
+    '/common/application_config_internal.js',
+    '/customize/authentication-provider.js',
+    '/common/outer/local-store.js',
+    '/api/config'
+], function (AppConfig, AuthenticationProvider, LocalStore, ServerConfig) {
+
   AppConfig.availablePadTypes = ['drive', 'pad', 'code', 'slide'];
   AppConfig.registeredOnlyTypes = [];
-  
+  AppConfig.disableFeedback = true;
+  AppConfig.disableProfile = true;
+
   AppConfig.beforeLogin = function(isLoggedIn, callback) {
     if (!isLoggedIn && ServerConfig.delegatedIdentityManagement) {
       AuthenticationProvider.triggerLogin(callback);
@@ -21,6 +24,19 @@ define([
       callback();
     }
   };
+
+  AppConfig.getAvatarUri = function(accountName) {
+    return ServerConfig.openpaasAPIBaseUri + '/avatars?email=' + encodeURIComponent(accountName);
+  }
+
+  function setAvatarFromOpenPaaS(getAvatarUri) {
+    return function(api, callback) {
+      var avatarUri = getAvatarUri(LocalStore.getAccountName());
+      api.setAvatar(avatarUri, callback);
+    };
+  }
+
+  AppConfig.afterLogin = setAvatarFromOpenPaaS(AppConfig.getAvatarUri);
 
   return AppConfig;
 });
