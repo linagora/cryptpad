@@ -47,16 +47,16 @@ module.exports = {
         // IE/Edge
         "frame-src blob: *",
 
-        "media-src * blob:",
+        "media-src * http: blob:",
 
         /*  this allows connections over secure or insecure websockets
             if you are deploying to production, you'll probably want to remove
             the ws://* directive, and change '*' to your domain
          */
-        "connect-src 'self' ws: wss: blob:" + domain,
+        "connect-src * http: ws: wss: blob:" + domain,
 
         // data: is used by codemirror
-        "img-src 'self' data: blob:" + domain,
+        "img-src * http: data: blob:" + domain,
 
         // for accounts.cryptpad.fr authentication and pad2 cross-domain iframe sandbox
         "frame-ancestors *",
@@ -325,4 +325,21 @@ module.exports = {
     //  '/etc/apache2/ssl/my_public_cert.crt',
     //  '/etc/apache2/ssl/my_certificate_authorities_cert_chain.ca'
     //],
+
+    /**
+     * Identity Management can be delegated to an external server (SSO).
+     * In that case, an API endpoint /api/me is exposed to provide
+     * user identity to the client.
+     */
+    //delegatedIdentityManagement: true,
+
+    /* Base uri for accessing OpenPaas API */
+    //openpaasAPIBaseUri: 'http://openpaas.local/api',
+
+    /** This param can be used to add a "Share by email" entry
+     *  in the Share modal of a pad. It will open an OpenPaaS
+     *  email composer allowing to send the pad URL to any OpenPaaS user.
+     */
+    //openpaasEmailShareUrl: 'http://openpaas.local' + '/#/unifiedinbox/compose?mailto=',
+
 };
