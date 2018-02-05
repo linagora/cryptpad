@@ -8,9 +8,9 @@
 define([
     '/common/application_config_internal.js',
     '/customize/authentication-provider.js',
-    '/common/outer/local-store.js',
+    '/common/common-constants.js',
     '/api/config'
-], function (AppConfig, AuthenticationProvider, LocalStore, ServerConfig) {
+], function (AppConfig, AuthenticationProvider, Constants, ServerConfig) {
 
   AppConfig.availablePadTypes = ['drive', 'pad', 'code', 'slide'];
   AppConfig.registeredOnlyTypes = [];
@@ -45,7 +45,7 @@ define([
 
   function setAvatarFromOpenPaaS(getAvatarUri) {
     return function(api, callback) {
-      var avatarUri = getAvatarUri(LocalStore.getAccountName());
+      var avatarUri = getAvatarUri(localStorage.getItem(Constants.userNameKey));
       api.setAvatar(avatarUri, callback);
     };
   }
