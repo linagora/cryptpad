@@ -52,5 +52,9 @@ define([
 
   AppConfig.afterLogin = setAvatarFromOpenPaaS(AppConfig.getAvatarUri);
 
+  AppConfig.customizeLogout = function postLogoutHook(callback) {
+    window.location.replace(ServerConfig.ssoLogoutUri);
+  };
+
   return AppConfig;
 });

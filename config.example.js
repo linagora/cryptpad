@@ -326,7 +326,14 @@ module.exports = {
     //  '/etc/apache2/ssl/my_certificate_authorities_cert_chain.ca'
     //],
 
-    /**
+    /*
+    * When delegating Identity Management to an external server,
+    * You will need to set a custom Logout URL so that when logging
+    * out from CryptPad, you get logged out from the SSO too.
+    */
+    //ssoLogoutUri: 'http://auth.openpaas.local/?logout=1',
+
+    /*
      * Identity Management can be delegated to an external server (SSO).
      * In that case, an API endpoint /api/me is exposed to provide
      * user identity to the client.
