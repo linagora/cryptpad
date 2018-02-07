@@ -19,10 +19,10 @@ define([
 
   AppConfig.beforeLogin = function(isLoggedIn, callback) {
     if (!isLoggedIn && ServerConfig.delegatedIdentityManagement) {
-      AuthenticationProvider.triggerLogin(callback);
-    } else {
-      callback();
+      return AuthenticationProvider.triggerLoginOrRegister(callback);
     }
+
+    return callback();
   };
   
   if (ServerConfig.openpaasEmailShareUrl) {
