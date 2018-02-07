@@ -30,6 +30,7 @@ userPassword: <uniqueUsername>
 4) Go to your local OpenPaaS. You should be requested to log in using the LemonLDAP login page; log in as **User 1**.   
 5) Once logged in, click on the OpenPaaS apps menu and select "Cryptpad"    
 6) You should be redirected to Cryptpad; check that your new account was created (you should be logged in as **User 1**, previously unknown by CryptPad).  
+Check that your OpenPaaS avatar was provided as avatar in CryptPad (should be a letter with a **colored background**)
 
 ### Log-out   
 - [ ] Tested  

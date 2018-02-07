@@ -22,6 +22,8 @@ define([
         proxy.edPrivate = result.edPrivate;
         proxy.curvePublic = result.curvePublic;
         proxy.curvePrivate = result.curvePrivate;
+
+        proxy.profile =  {};
     }
 
     function triggerRegistration(Login, LocalStore, username, pass, cb) {
