@@ -499,71 +499,7 @@ define([
     };
 
     Pages['/'] = Pages['/index.html'] = function () {
-        var showingMore = false;
-
-        var icons = [
-                [ 'pad', '/pad/', Msg.main_richTextPad, 'fa-file-word-o' ],
-                [ 'code', '/code/', Msg.main_codePad, 'fa-file-code-o' ],
-                [ 'slide', '/slide/', Msg.main_slidePad, 'fa-file-powerpoint-o' ],
-                [ 'poll', '/poll/', Msg.main_pollPad, 'fa-calendar' ],
-                [ 'whiteboard', '/whiteboard/', Msg.main_whiteboardPad, 'fa-paint-brush' ],
-                [ 'recent', '/drive/', Msg.main_localPads, 'fa-hdd-o' ]
-            ].filter(function (x) {
-                return isAvailableType(x[1]);
-            })
-            .map(function (x, i) {
-                var s = 'div.bs-callout.cp-callout-' + x[0];
-                if (i > 2) { s += '.cp-more.cp-hidden'; }
-                return h('a', [
-                    { href: x[1] },
-                    h(s, [
-                        h('i.fa.' + x[3]),
-                        h('div.pad-button-text', [ h('h4', x[2]) ])
-                    ])
-                ]);
-            });
-
-        var more = icons.length < 4? undefined: h('div.bs-callout.cp-callout-more', [
-                h('div.cp-callout-more-lessmsg.cp-hidden', [
-                    "see less ",
-                    h('i.fa.fa-caret-up')
-                ]),
-                h('div.cp-callout-more-moremsg', [
-                    "see more ",
-                    h('i.fa.fa-caret-down')
-                ]),
-                {
-                    onclick: function () {
-                        if (showingMore) {
-                            $('.cp-more, .cp-callout-more-lessmsg').addClass('cp-hidden');
-                            $('.cp-callout-more-moremsg').removeClass('cp-hidden');
-                        } else {
-                            $('.cp-more, .cp-callout-more-lessmsg').removeClass('cp-hidden');
-                            $('.cp-callout-more-moremsg').addClass('cp-hidden');
-                        }
-                        showingMore = !showingMore;
-                    }
-                }
-            ]);
-
-        return [
-            h('div#cp-main', [
-                infopageTopbar(),
-                h('div.container.cp-container', [
-                    h('div.row', [
-                        h('div.cp-title.col-12.col-sm-6', [
-                            h('img', { src: '/customize/cryptpad-new-logo-colors-logoonly.png?' + urlArgs }),
-                            h('h1', 'CryptPad'),
-                            h('p', Msg.main_catch_phrase)
-                        ]),
-                        h('div.col-12.col-sm-6', [
-                            icons,
-                            more
-                        ])
-                    ])
-                ]),
-            ]),
-        ];
+        return window.location.replace('/drive');
     };
 
     var loadingScreen = Pages.loadingScreen = function () {

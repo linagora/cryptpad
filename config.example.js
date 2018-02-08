@@ -169,7 +169,7 @@ module.exports = {
      *    development. Running a public instance that provides a "better deal" than cryptpad.fr
      *    is effectively using the project against itself.
      */
-    defaultStorageLimit: 50 * 1024 * 1024,
+    defaultStorageLimit: 10 * 1024 * 1024 * 1024,
 
     /*
      *  CryptPad allows administrators to give custom limits to their friends.
