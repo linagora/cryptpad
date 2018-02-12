@@ -16,6 +16,7 @@ define([
   AppConfig.registeredOnlyTypes = [];
   AppConfig.disableFeedback = true;
   AppConfig.disableProfile = true;
+  AppConfig.hideUsageBar = true;
 
   AppConfig.beforeLogin = function(isLoggedIn, callback) {
     if (!isLoggedIn && ServerConfig.delegatedIdentityManagement) {
