@@ -864,7 +864,7 @@ define(function () {
     out.share_openpaasCategory = "With OpenPaaS";
     out.share_openpaasLink = "Share by Email";
     out.share_openpaasEmailSubject = "Access to my pad";
-    out.share_openpaasEmailContent = "Hello,\n\nI shared a pad with you:\n\n{0}\n\n{1}\n\nRegards";
+    out.share_openpaasEmailContent = "Hello,<br /><br />I shared a pad with you:<br /><br /><a href='{0}'>{0}</a><br /><br />{1}<br /><br />Regards";
     out.share_openpaasEditRightsNote = "You have the right to collaborate on this pad.";
     out.share_openpaasReadOnlyRightsNote = "You will be able to read this pad.";
 

@@ -70,7 +70,7 @@ Check that your OpenPaaS avatar was provided as avatar in CryptPad (should be a 
 23) Click on the share icon again, but leave the radio button selection to `Edit` and click "Share by email"   
 22) Add **User 1** as recipient (you should have autocomplete),   
 23) Send the email,   
-24) Close window and logout   
+24) Check that the email composer is closed automatically on send      
 25) Log back into your local OpenPaaS as **User 1**   
 26) Copy/paste the link received by email and check that you can edit the document.   
 

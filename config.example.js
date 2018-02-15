@@ -347,6 +347,6 @@ module.exports = {
      *  in the Share modal of a pad. It will open an OpenPaaS
      *  email composer allowing to send the pad URL to any OpenPaaS user.
      */
-    //openpaasEmailShareUrl: 'http://openpaas.local' + '/#/unifiedinbox/compose?mailto=',
+    //openpaasEmailShareUrl: 'http://openpaas.local/unifiedinbox/mailto?uri=',
 
 };
