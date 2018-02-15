@@ -32,17 +32,25 @@ define([
             $(openpaasShareTabContent).find('#cp-op-share-editable-true').attr('disabled', true);
         }
 
-        var getLinkValue = function () {
+        function getLinkValue() {
             var edit = $(openpaasShareTabContent).find('#cp-op-share-editable-true').is(':checked');
             var hash = (edit && hashes.editHash) ? hashes.editHash : hashes.viewHash;
             var href = padConfig.origin + padConfig.pathname + '#' + hash;
             return href;
         };
 
-        var getPadRightsNote = function() {
+        function getPadRightsNote() {
             var editRights = $(openpaasShareTabContent).find('#cp-op-share-editable-true').is(':checked');
             return (editRights ? Messages.share_openpaasEditRightsNote : Messages.share_openpaasReadOnlyRightsNote );
         };
+
+        function buildMailtoString(mailToParams) {
+            var qs = Object.keys(mailToParams).reduce(function(acc, paramName) {
+                return acc += encodeURIComponent(paramName) + '=' + encodeURIComponent(mailToParams[paramName]) + '&';
+            }, 'mailto:?');
+
+            return qs;
+        }
 
         var linkButtons = [{
             name: Messages.cancel,
@@ -51,13 +59,12 @@ define([
         },{
             name: Messages.share_openpaasLink,
             onClick: function () {
-                var emailBody = Messages._getKey('share_openpaasEmailContent', [getLinkValue(), getPadRightsNote()]);
-                var jsonMailtoObject = {
+                var mailToParams = {
                     subject: Messages.share_openpaasEmailSubject,
-                    textBody: emailBody,
-                    htmlBody: emailBody
-                };
-                var fullShareLink = openpaasEmailShareUrl + encodeURIComponent(JSON.stringify(jsonMailtoObject));
+                    body: Messages._getKey('share_openpaasEmailContent', [getLinkValue(), getPadRightsNote()])
+                },
+                fullShareLink = openpaasEmailShareUrl + encodeURIComponent(buildMailtoString(mailToParams));
+
                 Utils.openCenteredPopup(fullShareLink, 'share-by-email', 600, 400);
             },
             keys: [13]
