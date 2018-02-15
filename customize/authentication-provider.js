@@ -26,21 +26,32 @@ define([
         proxy.profile =  {};
     }
 
-    function triggerRegistration(Login, LocalStore, username, pass, cb) {
+    function setDisplayName(proxy, displayName) {
+        if (!proxy || !displayName) { return; }
+        proxy[Constants.displayNameKey] = displayName;
+    }
+
+    function continueLoginWhenSuccessful(LocalStore, Me, result, done) {
+        return Realtime.whenRealtimeSyncs(result.realtime, function () {
+            return LocalStore.login(result.userHash, result.userName, function() {
+                setDisplayName(result.proxy, Me.fullname);
+                if (done) { done(); }
+            });
+        });
+    }
+
+    function triggerRegistration(Login, LocalStore, Me, done) {
         isRegistering = true;
 
-        Login.loginOrRegister(username, pass, isRegistering, function(err, result) {
+        Login.loginOrRegister(Me.email, Me.pkey, isRegistering, function(err, result) {
             if (err) {
                 // UNHANDLED ERROR
                 console.log("Error: ", err);
                 return cb(err);
             }
 
-            finalizeRegistration(LocalStore, result, username);
-
-            return Realtime.whenRealtimeSyncs(result.realtime, function () {
-                return LocalStore.login(result.userHash, result.userName, cb);
-            });
+            finalizeRegistration(LocalStore, result, Me.email);
+            if (done) { done(); }
         });
     }
 
@@ -53,14 +64,13 @@ define([
             isRegistering = false;
 
             Login.loginOrRegister(Me.email, Me.pkey, isRegistering, function(err, result) {
+                var loginFollowup = continueLoginWhenSuccessful.bind(this, LocalStore, Me);
                 if (!err) {
-                    return Realtime.whenRealtimeSyncs(result.realtime, function () {
-                        return LocalStore.login(result.userHash, result.userName, callback);
-                    });
+                    return loginFollowup(result, callback);
                 }
 
                 if (err && err === 'NO_SUCH_USER') {
-                    return triggerRegistration(Login, LocalStore, Me.email, Me.pkey, callback);
+                    return triggerRegistration(Login, LocalStore, Me, loginFollowup.bind(this, result, callback));
                 }
                 
                 // UNHANDLED ERROR
