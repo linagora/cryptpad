@@ -31,7 +31,7 @@ define([
         proxy[Constants.displayNameKey] = displayName;
     }
 
-    function continueLoginWhenSuccessful(LocalStore, Me, result, done) {
+    function continueLoginWhenSuccessful(LocalStore, Me, done, result) {
         return Realtime.whenRealtimeSyncs(result.realtime, function () {
             return LocalStore.login(result.userHash, result.userName, function() {
                 setDisplayName(result.proxy, Me.fullname);
@@ -40,7 +40,7 @@ define([
         });
     }
 
-    function triggerRegistration(Login, LocalStore, Me, done) {
+    function triggerRegistration(Login, LocalStore, Me, callback) {
         isRegistering = true;
 
         Login.loginOrRegister(Me.email, Me.pkey, isRegistering, function(err, result) {
@@ -51,11 +51,11 @@ define([
             }
 
             finalizeRegistration(LocalStore, result, Me.email);
-            if (done) { done(); }
+            if (callback) { callback(result); }
         });
     }
 
-    AuthenticationProvider.triggerLoginOrRegister = function (callback) {
+    AuthenticationProvider.triggerLoginOrRegister = function (done) {
         require([
             '/customize/login.js',
             '/common/outer/local-store.js',
@@ -64,18 +64,18 @@ define([
             isRegistering = false;
 
             Login.loginOrRegister(Me.email, Me.pkey, isRegistering, function(err, result) {
-                var loginFollowup = continueLoginWhenSuccessful.bind(this, LocalStore, Me);
+                var loginFollowup = continueLoginWhenSuccessful.bind(this, LocalStore, Me, done);
                 if (!err) {
-                    return loginFollowup(result, callback);
+                    return loginFollowup(result);
                 }
 
                 if (err && err === 'NO_SUCH_USER') {
-                    return triggerRegistration(Login, LocalStore, Me, loginFollowup.bind(this, result, callback));
+                    return triggerRegistration(Login, LocalStore, Me, loginFollowup);
                 }
                 
                 // UNHANDLED ERROR
-                console.log('Unhandled error');
-                return callback(err);
+                console.log('Unhandled error: ', err);
+                return done(err);
             });
         });
     };
