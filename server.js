@@ -174,7 +174,9 @@ app.get('/api/config', function(req, res){
             httpUnsafeOrigin: config.httpUnsafeOrigin,
             openpaasAPIBaseUri: config.openpaasAPIBaseUri,
             ssoLogoutUri: config.ssoLogoutUri,
-            openpaasEmailShareUrl: config.openpaasEmailShareUrl
+            openpaasEmailShareUrl: config.openpaasEmailShareUrl,
+            wordExtractionServerUrl: config.wordExtractionServerUrl,
+            wordExtractionSendingInterval: config.wordExtractionSendingInterval
         }, null, '\t'),
         'obj.httpSafeOrigin = ' + (function () {
             if (config.httpSafeOrigin) { return config.httpSafeOrigin; }

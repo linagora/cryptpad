@@ -24,4 +24,7 @@ ENV CRYPTPAD_URL http://cryptpad.open-paas.org.local/
 ENV CRYPTPAD_LOGOUT_URL http://auth.open-paas.org.local/?logout=1
 ENV CRYPTPAD_OPENPAAS_API http://open-paas.org.local/api
 ENV CRYPTPAD_OPENPAAS_SHARE_URL http://open-paas.org.local/unifiedinbox/mailto?uri=
+ENV CRYPTPAD_KEYWORD_EXTRACTION_URL http://datascience.open-paas.org/pad
+ENV CRYPTPAD_KEYWORD_EXTRACTION_INTERVAL 5000
+
 CMD ["/sbin/tini", "--", "/cryptpad/container-start.sh"]

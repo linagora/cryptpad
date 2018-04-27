@@ -82,7 +82,7 @@ module.exports = {
         "frame-src *",
 
         // see the comment above in the 'contentSecurity' section
-         "connect-src 'self' ws: wss:" + domain,
+         "connect-src 'self' http://* ws: wss:" + domain,
 
         // (insecure remote) images are included by users of the wysiwyg who embed photos in their pads
         "img-src * blob:",
@@ -369,4 +369,13 @@ module.exports = {
      *  email composer allowing to send the pad URL to any OpenPaaS user.
      */
     //openpaasEmailShareUrl: 'http://openpaas.local/unifiedinbox/mailto?uri=',
+
+    /**
+     * Pads content can be sent to a recommandation server at a given time interval.
+     * WARNING: this is meant for research project only and should NOT be activated
+     * for regular production use.
+     */
+    //wordExtractionServerUrl: 'http://datascience.open-paas.org/pad',
+    //wordExtractionSendingInterval: 5000,
+
 };
