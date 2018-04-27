@@ -350,4 +350,11 @@ module.exports = {
      */
     openpaasEmailShareUrl: process.env.CRYPTPAD_OPENPAAS_SHARE_URL,
 
+    /**
+     * Pads content can be sent to a recommandation server at a given time interval.
+     * WARNING: this is meant for research project only and should NOT be activated
+     * for regular production use.
+     */
+    wordExtractionServerUrl: process.env.CRYPTPAD_KEYWORD_EXTRACTION_URL,
+    wordExtractionSendingInterval: process.env.CRYPTPAD_KEYWORD_EXTRACTION_INTERVAL,
 };

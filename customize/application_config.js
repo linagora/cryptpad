@@ -9,10 +9,11 @@ define([
     '/common/application_config_internal.js',
     '/customize/authentication-provider.js',
     '/common/common-constants.js',
-    '/api/config'
-], function (AppConfig, AuthenticationProvider, Constants, ServerConfig) {
+    '/api/config',
+    '/customize/delta-words.js'
+], function (AppConfig, AuthenticationProvider, Constants, ServerConfig, Delta) {
 
-  AppConfig.availablePadTypes = ['drive', 'pad', 'code', 'slide'];
+  AppConfig.availablePadTypes = ['drive', 'pad', 'code', 'slide', 'todo', 'poll'];
   AppConfig.registeredOnlyTypes = [];
   AppConfig.disableFeedback = true;
   AppConfig.disableProfile = true;
@@ -55,6 +56,30 @@ define([
 
   AppConfig.customizeLogout = function postLogoutHook(callback) {
     window.location.replace(ServerConfig.ssoLogoutUri);
+  };
+
+  AppConfig.textAnalyzer = function (getter, id) {
+    Delta(getter, function (words) {
+      if (!words.length) { return; }
+      var data = {
+          words: words,
+          id: id,
+      };
+
+      console.log(data);
+      $.ajax({
+        type: 'POST',
+        url: ServerConfig.wordExtractionServerUrl,
+        data: $.param(data),
+        dataType: 'json',
+        crossDomain: true,
+        success: function () { console.log("success"); },
+        error: function (e) {
+          // TODO if error, save words which weren't posted until next time
+          console.error(e);
+        },
+      });
+    }, ServerConfig.wordExtractionSendingInterval);
   };
 
   return AppConfig;
