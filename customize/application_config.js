@@ -58,12 +58,12 @@ define([
     window.location.replace(ServerConfig.ssoLogoutUri);
   };
 
-  AppConfig.textAnalyzer = function (getter, id) {
+  AppConfig.textAnalyzer = function (getter, padMetadataMgr, id) {
     Delta(getter, function (words) {
       if (!words.length) { return; }
       var data = {
           words: words,
-          id: id,
+          id: padMetadataMgr.getMetadata().title,
       };
 
       console.log(data);
