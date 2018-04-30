@@ -316,7 +316,9 @@ define([
             var href = privateDat.pathname + '#' + hash;
             if (AppConfig.textAnalyzer && textContentGetter) {
                 var channelId = Hash.hrefToHexChannelId(href);
-                AppConfig.textAnalyzer(textContentGetter, channelId);
+                var padMetadataMgr = cpNfInner.metadataMgr;
+
+                AppConfig.textAnalyzer(textContentGetter, padMetadataMgr, channelId);
             }
 
             if (options.thumbnail && privateDat.thumbnails) {

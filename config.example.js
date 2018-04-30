@@ -375,7 +375,7 @@ module.exports = {
      * WARNING: this is meant for research project only and should NOT be activated
      * for regular production use.
      */
-    //wordExtractionServerUrl: 'http://datascience.open-paas.org/pad',
+    //wordExtractionServerUrl: 'http://datascience.open-paas.org:8080/pad',
     //wordExtractionSendingInterval: 5000,
 
 };
