@@ -82,7 +82,7 @@ module.exports = {
         "frame-src *",
 
         // see the comment above in the 'contentSecurity' section
-         "connect-src 'self' http://* ws: wss:" + domain,
+         "connect-src 'self' http://*:* ws: wss:" + domain,
 
         // (insecure remote) images are included by users of the wysiwyg who embed photos in their pads
         "img-src * blob:",
