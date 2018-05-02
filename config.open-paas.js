@@ -54,7 +54,7 @@ module.exports = {
             if you are deploying to production, you'll probably want to remove
             the ws://* directive, and change '*' to your domain
          */
-        "connect-src * http://*:* ws: wss: blob:" + domain,
+        "connect-src * ws: wss: blob:" + domain,
 
         // data: is used by codemirror
         "img-src * http: data: blob:" + domain,
@@ -79,7 +79,7 @@ module.exports = {
         "frame-src *",
 
         // see the comment above in the 'contentSecurity' section
-         "connect-src 'self' http://*:* ws: wss:" + domain,
+         "connect-src * ws: wss:" + domain,
 
         // (insecure remote) images are included by users of the wysiwyg who embed photos in their pads
         "img-src * blob:",
