@@ -132,10 +132,12 @@ define([
             // Check if the pad exists on server
             if (!window.location.hash) { isNewFile = true; return; }
 
-            Cryptpad.isNewChannel(window.location.href, waitFor(function (e, isNew) {
-                if (e) { return console.error(e); }
-                isNewFile = Boolean(isNew);
-            }));
+            if (realtime) {
+                Cryptpad.isNewChannel(window.location.href, waitFor(function (e, isNew) {
+                    if (e) { return console.error(e); }
+                    isNewFile = Boolean(isNew);
+                }));
+            }
         }).nThen(function () {
             var readOnly = secret.keys && !secret.keys.editKeyStr;
             var isNewHash = true;
@@ -185,7 +187,7 @@ define([
                             upgradeURL: Cryptpad.upgradeURL
                         },
                         isNewFile: isNewFile,
-                        isDeleted: window.location.hash.length > 0,
+                        isDeleted: isNewFile && window.location.hash.length > 0,
                         forceCreationScreen: forceCreationScreen
                     };
                     for (var k in additionalPriv) { metaObj.priv[k] = additionalPriv[k]; }
@@ -323,23 +325,35 @@ define([
                     validateKey: secret.keys.validateKey
                 }, function (encryptedMsgs) {
                     cb(encryptedMsgs.map(function (msg) {
-                        return crypto.decrypt(msg, true);
+                        // The 3rd parameter "true" means we're going to skip signature validation.
+                        // We don't need it since the message is already validated serverside by hk
+                        return crypto.decrypt(msg, true, true);
                     }));
                 });
             });
 
             sframeChan.on('Q_GET_PAD_ATTRIBUTE', function (data, cb) {
+                var href;
+                if (readOnly && hashes.editHash) {
+                    // If we have a stronger hash, use it for pad attributes
+                    href = window.location.pathname + '#' + hashes.editHash;
+                }
                 Cryptpad.getPadAttribute(data.key, function (e, data) {
                     cb({
                         error: e,
                         data: data
                     });
-                });
+                }, href);
             });
             sframeChan.on('Q_SET_PAD_ATTRIBUTE', function (data, cb) {
+                var href;
+                if (readOnly && hashes.editHash) {
+                    // If we have a stronger hash, use it for pad attributes
+                    href = window.location.pathname + '#' + hashes.editHash;
+                }
                 Cryptpad.setPadAttribute(data.key, data.value, function (e) {
                     cb({error:e});
-                });
+                }, href);
             });
 
             sframeChan.on('Q_GET_ATTRIBUTE', function (data, cb) {
@@ -417,6 +431,8 @@ define([
             // File picker
             var FP = {};
             var initFilePicker = function (cfg) {
+                // cfg.hidden means pre-loading the filepicker while keeping it hidden.
+                // if cfg.hidden is true and the iframe already exists, do nothing
                 if (!FP.$iframe) {
                     var config = {};
                     config.onFilePicked = function (data) {
@@ -435,7 +451,7 @@ define([
                     };
                     FP.$iframe = $('<iframe>', {id: 'sbox-filePicker-iframe'}).appendTo($('body'));
                     FP.picker = FilePicker.create(config);
-                } else {
+                } else if (!cfg.hidden) {
                     FP.$iframe.show();
                     FP.picker.refresh(cfg);
                 }
@@ -455,6 +471,36 @@ define([
             sframeChan.on('Q_TEMPLATE_EXIST', function (type, cb) {
                 Cryptpad.listTemplates(type, function (err, templates) {
                     cb(templates.length > 0);
+                });
+            });
+            var getKey = function (href) {
+                var parsed = Utils.Hash.parsePadUrl(href);
+                return 'thumbnail-' + parsed.type + '-' + parsed.hashData.channel;
+            };
+            sframeChan.on('Q_CREATE_TEMPLATES', function (type, cb) {
+                Cryptpad.getSecureFilesList({
+                    types: [type],
+                    where: ['template']
+                }, function (err, data) {
+                    // NOTE: Never return data directly!
+                    if (err) { return void cb({error: err}); }
+
+                    var res = [];
+                    nThen(function (waitFor) {
+                        Object.keys(data).map(function (el) {
+                            var k = getKey(data[el].href);
+                            Utils.LocalStore.getThumbnail(k, waitFor(function (e, thumb) {
+                                res.push({
+                                    id: el,
+                                    name: data[el].filename || data[el].title || '?',
+                                    thumbnail: thumb,
+                                    used: data[el].used || 0
+                                });
+                            }));
+                        });
+                    }).nThen(function () {
+                        cb({data: res});
+                    });
                 });
             });
 
@@ -572,7 +618,7 @@ define([
                 var replaceHash = function (hash) {
                     if (window.history && window.history.replaceState) {
                         if (!/^#/.test(hash)) { hash = '#' + hash; }
-                        void window.history.replaceState({}, window.document.title, hash);
+                        window.history.replaceState({}, window.document.title, hash);
                         if (typeof(window.onhashchange) === 'function') {
                             window.onhashchange();
                         }
@@ -601,10 +647,25 @@ define([
                         replaceHash(Utils.Hash.getEditHashFromKeys(wc, secret.keys));
                     }
                 };
-                Object.keys(rtConfig).forEach(function (k) {
-                    cpNfCfg[k] = rtConfig[k];
+
+                nThen(function (waitFor) {
+                    if (isNewFile && cfg.owned && !window.location.hash) {
+                        Cryptpad.getMetadata(waitFor(function (err, m) {
+                            cpNfCfg.owners = [m.priv.edPublic];
+                        }));
+                    } else if (isNewFile && !cfg.useCreationScreen && window.location.hash) {
+                        console.log("new file with hash in the address bar in an app without pcs and which requires owners");
+                        sframeChan.onReady(function () {
+                            sframeChan.query("EV_LOADING_ERROR", "DELETED");
+                        });
+                        waitFor.abort();
+                    }
+                }).nThen(function () {
+                    Object.keys(rtConfig).forEach(function (k) {
+                        cpNfCfg[k] = rtConfig[k];
+                    });
+                    CpNfOuter.start(cpNfCfg);
                 });
-                CpNfOuter.start(cpNfCfg);
             };
 
             sframeChan.on('Q_CREATE_PAD', function (data, cb) {
@@ -623,6 +684,7 @@ define([
                 // Update metadata values and send new metadata inside
                 parsed = Utils.Hash.parsePadUrl(window.location.href);
                 defaultTitle = Utils.Hash.getDefaultName(parsed);
+                hashes = Utils.Hash.getHashes(secret.channel, secret);
                 readOnly = false;
                 updateMeta();
 
@@ -633,28 +695,41 @@ define([
                 if (data.expire) {
                     rtConfig.expire = data.expire;
                 }
-                if (data.template) {
-                    // Pass rtConfig to useTemplate because Cryptput will create the file and
-                    // we need to have the owners and expiration time in the first line on the
-                    // server
-                    Cryptpad.useTemplate(data.template, Cryptget, function () {
-                        startRealtime();
-                        cb();
-                    }, rtConfig);
-                    return;
-                }
-                // Start realtime outside the iframe and callback
-                startRealtime(rtConfig);
-                cb();
+                nThen(function(waitFor) {
+                    if (data.templateId) {
+                        if (data.templateId === -1) {
+                            Cryptpad.setInitialPath(['template']);
+                            return;
+                        }
+                        Cryptpad.getPadData(data.templateId, waitFor(function (err, d) {
+                            data.template = d.href;
+                        }));
+                    }
+                }).nThen(function () {
+                    if (data.template) {
+                        // Pass rtConfig to useTemplate because Cryptput will create the file and
+                        // we need to have the owners and expiration time in the first line on the
+                        // server
+                        Cryptpad.useTemplate(data.template, Cryptget, function () {
+                            startRealtime();
+                            cb();
+                        }, rtConfig);
+                        return;
+                    }
+                    // Start realtime outside the iframe and callback
+                    startRealtime(rtConfig);
+                    cb();
+                });
             });
 
             sframeChan.ready();
 
             Utils.Feedback.reportAppUsage();
 
-            if (!realtime) { return; }
-            if (isNewFile && Utils.LocalStore.isLoggedIn()
-                && AppConfig.displayCreationScreen && cfg.useCreationScreen) { return; }
+            if (!realtime && !Test.testing) { return; }
+            if (isNewFile && cfg.useCreationScreen && !Test.testing) { return; }
+            //if (isNewFile && Utils.LocalStore.isLoggedIn()
+            //    && AppConfig.displayCreationScreen && cfg.useCreationScreen) { return; }
 
             startRealtime();
         });

@@ -53,7 +53,11 @@ define([
                     return void cb(null, Hash.getSecrets('profile', editHash));
                 }
                 // 3rd case: profile creation (create a new random hash, store it later if needed)
-                if (!Utils.LocalStore.isLoggedIn()) { return void cb(); }
+                if (!Utils.LocalStore.isLoggedIn()) {
+                    // Unregistered users can't create a profile
+                    window.location.href = '/drive/';
+                    return void cb();
+                }
                 var hash = Hash.createRandomHash();
                 var secret = Hash.getSecrets('profile', hash);
                 Cryptpad.pinPads([secret.channel], function (e) {
@@ -93,6 +97,7 @@ define([
             getSecrets: getSecrets,
             noHash: true, // Don't add the hash in the URL if it doesn't already exist
             addRpc: addRpc,
+            owned: true
         });
     });
 });

@@ -90,11 +90,14 @@ define([
     funcs.updateTags = callWithCommon(UIElements.updateTags);
     funcs.createLanguageSelector = callWithCommon(UIElements.createLanguageSelector);
     funcs.createMarkdownToolbar = callWithCommon(UIElements.createMarkdownToolbar);
+    funcs.createHelpMenu = callWithCommon(UIElements.createHelpMenu);
     funcs.getPadCreationScreen = callWithCommon(UIElements.getPadCreationScreen);
     funcs.createNewPadModal = callWithCommon(UIElements.createNewPadModal);
+    funcs.onServerError = callWithCommon(UIElements.onServerError);
 
     // Thumb
     funcs.displayThumbnail = callWithCommon(Thumb.displayThumbnail);
+    funcs.addThumbnail = Thumb.addThumbnail;
 
     // History
     funcs.getHistory = callWithCommon(History.create);
@@ -166,11 +169,36 @@ define([
     };
 
     // Store
+    funcs.handleNewFile = function (waitFor) {
+        if (window.__CRYPTPAD_TEST__) { return; }
+        var priv = ctx.metadataMgr.getPrivateData();
+        if (priv.isNewFile) {
+            var c = (priv.settings.general && priv.settings.general.creation) || {};
+            var skip = !AppConfig.displayCreationScreen || (c.skip && !priv.forceCreationScreen);
+            // If this is a new file but we have a hash in the URL and pad creation screen is
+            // not displayed, then display an error...
+            if (priv.isDeleted && (!funcs.isLoggedIn() || skip)) {
+                UI.errorLoadingScreen(Messages.inactiveError, false, function () {
+                    UI.addLoadingScreen();
+                    return void funcs.createPad({}, waitFor());
+                });
+                return;
+            }
+            // Otherwise, if we don't display the screen, it means it is not a deleted pad
+            // so we can continue and start realtime...
+            if (!funcs.isLoggedIn() || skip) {
+                return void funcs.createPad(c, waitFor());
+            }
+            // If we display the pad creation screen, it will handle deleted pads directly
+            funcs.getPadCreationScreen(c, waitFor());
+        }
+    };
     funcs.createPad = function (cfg, cb) {
         ctx.sframeChan.query("Q_CREATE_PAD", {
             owned: cfg.owned,
             expire: cfg.expire,
-            template: cfg.template
+            template: cfg.template,
+            templateId: cfg.templateId
         }, cb);
     };
 
@@ -316,6 +344,27 @@ define([
         window.open(bounceHref);
     };
 
+    funcs.fixLinks = function (domElement) {
+        var origin = ctx.metadataMgr.getPrivateData().origin;
+        $(domElement).find('a[target="_blank"]').click(function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var href = $(this).attr('href');
+            var absolute = /^https?:\/\//i;
+            if (!absolute.test(href)) {
+                if (href.slice(0,1) !== '/') { href = '/' + href; }
+                href = origin + href;
+            }
+            funcs.openUnsafeURL(href);
+        });
+        $(domElement).find('a[target!="_blank"]').click(function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            funcs.gotoURL($(this).attr('href'));
+        });
+        return $(domElement)[0];
+    };
+
     funcs.whenRealtimeSyncs = evRealtimeSynced.reg;
 
     var logoutHandlers = [];
@@ -370,19 +419,6 @@ define([
 
             UI.addTooltips();
 
-            ctx.sframeChan.on('EV_LOGOUT', function () {
-                $(window).on('keyup', function (e) {
-                    if (e.keyCode === 27) {
-                        UI.removeLoadingScreen();
-                    }
-                });
-                UI.addLoadingScreen({hideTips: true});
-                UI.errorLoadingScreen(Messages.onLogout, true);
-                logoutHandlers.forEach(function (h) {
-                    if (typeof (h) === "function") { h(); }
-                });
-            });
-
             ctx.sframeChan.on('Q_INCOMING_FRIEND_REQUEST', function (confirmMsg, cb) {
                 UI.confirm(confirmMsg, cb, null, true);
             });
@@ -398,6 +434,32 @@ define([
                 var feedback = ctx.metadataMgr.getPrivateData().feedbackAllowed;
                 Feedback.init(feedback);
             } catch (e) { Feedback.init(false); }
+
+            ctx.sframeChan.on('EV_LOADING_ERROR', function (err) {
+                if (err === 'DELETED') {
+                    var msg = Messages.deletedError + '<br>' + Messages.errorRedirectToHome;
+                    UI.errorLoadingScreen(msg, false, function () {
+                        funcs.gotoURL('/drive/');
+                    });
+                }
+            });
+
+            ctx.sframeChan.on('EV_LOGOUT', function () {
+                $(window).on('keyup', function (e) {
+                    if (e.keyCode === 27) {
+                        UI.removeLoadingScreen();
+                    }
+                });
+                UI.addLoadingScreen({hideTips: true});
+                var origin = ctx.metadataMgr.getPrivateData().origin;
+                var href = origin + "/login/";
+                var onLogoutMsg = Messages._getKey('onLogout', ['<a href="' + href + '" target="_blank">', '</a>']);
+                UI.errorLoadingScreen(onLogoutMsg, true);
+                logoutHandlers.forEach(function (h) {
+                    if (typeof (h) === "function") { h(); }
+                });
+            });
+
             ctx.sframeChan.ready();
             cb(funcs);
         });

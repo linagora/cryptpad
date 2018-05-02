@@ -13,6 +13,7 @@ const Package = require('./package.json');
 const Pinned = require('./pinned');
 const Saferphore = require("saferphore");
 const nThen = require("nthen");
+const Mkdirp = require("mkdirp");
 
 var RPC = module.exports;
 
@@ -325,6 +326,24 @@ var getFileSize = function (Env, channel, cb) {
     });
 };
 
+var getMetadata = function (Env, channel, cb) {
+    if (!isValidId(channel)) { return void cb('INVALID_CHAN'); }
+
+    if (channel.length === 32) {
+        if (typeof(Env.msgStore.getChannelMetadata) !== 'function') {
+            return cb('GET_CHANNEL_METADATA_UNSUPPORTED');
+        }
+
+        return void Env.msgStore.getChannelMetadata(channel, function (e, data) {
+            if (e) {
+                if (e.code === 'INVALID_METADATA') { return void cb(void 0, {}); }
+                return void cb(e.code);
+            }
+            cb(void 0, data);
+        });
+    }
+};
+
 var getMultipleFileSize = function (Env, channels, cb) {
     if (!Array.isArray(channels)) { return cb('INVALID_PIN_LIST'); }
     if (typeof(Env.msgStore.getChannelSize) !== 'function') {
@@ -428,8 +447,7 @@ var getHash = function (Env, publicKey, cb) {
 
 // The limits object contains storage limits for all the publicKey that have paid
 // To each key is associated an object containing the 'limit' value and a 'note' explaining that limit
-var limits = {};
-var updateLimits = function (config, publicKey, cb /*:(?string, ?any[])=>void*/) {
+var updateLimits = function (Env, config, publicKey, cb /*:(?string, ?any[])=>void*/) {
     if (config.adminEmail === false) {
         if (config.allowSubscriptions === false) { return; }
         throw new Error("allowSubscriptions must be false if adminEmail is false");
@@ -494,15 +512,15 @@ var updateLimits = function (config, publicKey, cb /*:(?string, ?any[])=>void*/)
         response.on('end', function () {
             try {
                 var json = JSON.parse(str);
-                limits = json;
+                Env.limits = json;
                 Object.keys(customLimits).forEach(function (k) {
                     if (!isLimit(customLimits[k])) { return; }
-                    limits[k] = customLimits[k];
+                    Env.limits[k] = customLimits[k];
                 });
 
                 var l;
                 if (userId) {
-                    var limit = limits[userId];
+                    var limit = Env.limits[userId];
                     l = limit && typeof limit.limit === "number" ?
                             [limit.limit, limit.plan, limit.note] : [defaultLimit, '', ''];
                 }
@@ -523,7 +541,7 @@ var updateLimits = function (config, publicKey, cb /*:(?string, ?any[])=>void*/)
 
 var getLimit = function (Env, publicKey, cb) {
     var unescapedKey = unescapeKeyCharacters(publicKey);
-    var limit = limits[unescapedKey];
+    var limit = Env.limits[unescapedKey];
     var defaultLimit = typeof(Env.defaultStorageLimit) === 'number'?
         Env.defaultStorageLimit: DEFAULT_LIMIT;
 
@@ -837,6 +855,17 @@ var removeOwnedChannel = function (Env, channelId, unsafeKey, cb) {
     });
 };
 
+/*  Users should be able to clear their own pin log with an authenticated RPC
+*/
+var removePins = function (Env, safeKey, cb) {
+    if (typeof(Env.pinStore.removeChannel) !== 'function') {
+        return void cb("E_NOT_IMPLEMENTED");
+    }
+    Env.pinStore.removeChannel(safeKey, function (err) {
+        cb(err);
+    });
+};
+
 var upload = function (Env, publicKey, content, cb) {
     var paths = Env.paths;
     var dec;
@@ -981,6 +1010,99 @@ var upload_complete = function (Env, publicKey, cb) {
     tryRandomLocation(handleMove);
 };
 
+var owned_upload_complete = function (Env, safeKey, cb) {
+    var session = getSession(Env.Sessions, safeKey);
+
+    // the file has already been uploaded to the staging area
+    // close the pending writestream
+    if (session.blobstage && session.blobstage.close) {
+        session.blobstage.close();
+        delete session.blobstage;
+    }
+
+    var oldPath = makeFilePath(Env.paths.staging, safeKey);
+    if (typeof(oldPath) !== 'string') {
+        return void cb('EINVAL_CONFIG');
+    }
+
+    // construct relevant paths
+    var root = Env.paths.staging;
+
+    //var safeKey = escapeKeyCharacters(safeKey);
+    var safeKeyPrefix = safeKey.slice(0, 2);
+
+    var blobId = createFileId();
+    var blobIdPrefix = blobId.slice(0, 2);
+
+    var plannedPath = Path.join(root, safeKeyPrefix, safeKey, blobIdPrefix);
+
+    var tries = 0;
+
+    var chooseSafeId = function (cb) {
+        if (tries >= 3) {
+            // you've already failed three times in a row
+            // give up and return an error
+            cb('E_REPEATED_FAILURE');
+        }
+
+        var path = Path.join(plannedPath, blobId);
+        Fs.access(path, Fs.constants.R_OK | Fs.constants.W_OK, function (e) {
+            if (!e) {
+                // generate a new id (with the same prefix) and recurse
+                blobId = blobIdPrefix + createFileId().slice(2);
+                return void chooseSafeId(cb);
+            } else if (e.code === 'ENOENT') {
+                // no entry, so it's safe for us to proceed
+                return void cb(void 0, path);
+            } else {
+                // it failed in an unexpected way. log it
+                // try again, but no more than a fixed number of times...
+                tries++;
+                chooseSafeId(cb);
+            }
+        });
+    };
+
+    // the user wants to move it into their own space
+    // /blob/safeKeyPrefix/safeKey/blobPrefix/blobID
+
+    var finalPath;
+    nThen(function (w) {
+        // make the requisite directory structure using Mkdirp
+        Mkdirp(plannedPath, w(function (e /*, path */) {
+            if (e) { // does not throw error if the directory already existed
+                w.abort();
+                return void cb(e);
+            }
+        }));
+    }).nThen(function (w) {
+        // produce an id which confirmably does not collide with another
+        chooseSafeId(w(function (e, path) {
+            if (e) {
+                w.abort();
+                return void cb(e);
+            }
+            finalPath = path; // this is where you'll put the new file
+        }));
+    }).nThen(function (w) {
+        // move the existing file to its new path
+
+        // flow is dumb and I need to guard against this which will never happen
+        /*:: if (typeof(oldPath) === 'object') { throw new Error('should never happen'); } */
+        Fs.rename(oldPath /* XXX */, finalPath, w(function (e) {
+            if (e) {
+                w.abort();
+                return void cb(e.code);
+            }
+            // otherwise it worked...
+        }));
+    }).nThen(function () {
+        // clean up their session when you're done
+        // call back with the blob id...
+        cb(void 0, blobId);
+    });
+};
+
 var upload_status = function (Env, publicKey, filesize, cb) {
     var paths = Env.paths;
 
@@ -1035,6 +1157,7 @@ var isNewChannel = function (Env, channel, cb) {
 var isUnauthenticatedCall = function (call) {
     return [
         'GET_FILE_SIZE',
+        'GET_METADATA',
         'GET_MULTIPLE_FILE_SIZE',
         'IS_CHANNEL_PINNED',
         'IS_NEW_CHANNEL',
@@ -1055,10 +1178,12 @@ var isAuthenticatedCall = function (call) {
         'GET_LIMIT',
         'UPLOAD_STATUS',
         'UPLOAD_COMPLETE',
+        'OWNED_UPLOAD_COMPLETE',
         'UPLOAD_CANCEL',
         'EXPIRE_SESSION',
         'CLEAR_OWNED_CHANNEL',
         'REMOVE_OWNED_CHANNEL',
+        'REMOVE_PINS',
     ].indexOf(call) !== -1;
 };
 
@@ -1097,7 +1222,11 @@ type NetfluxWebsocketSrvContext_t = {
     )=>void
 };
 */
-RPC.create = function (config /*:Config_t*/, cb /*:(?Error, ?Function)=>void*/) {
+RPC.create = function (
+    config /*:Config_t*/,
+    debuggable /*:<T>(string, T)=>T*/,
+    cb /*:(?Error, ?Function)=>void*/
+) {
     // load pin-store...
     console.log('loading rpc module...');
 
@@ -1115,8 +1244,10 @@ RPC.create = function (config /*:Config_t*/, cb /*:(?Error, ?Function)=>void*/) 
         msgStore: (undefined /*:any*/),
         pinStore: (undefined /*:any*/),
         pinnedPads: {},
-        evPinnedPadsReady: mkEvent(true)
+        evPinnedPadsReady: mkEvent(true),
+        limits: {}
     };
+    debuggable('rpc_env', Env);
 
     var Sessions = Env.Sessions;
     var paths = Env.paths;
@@ -1148,11 +1279,13 @@ RPC.create = function (config /*:Config_t*/, cb /*:(?Error, ?Function)=>void*/) 
             }
             case 'GET_FILE_SIZE':
                 return void getFileSize(Env, msg[1], function (e, size) {
-                    if (e) {
-                        console.error(e);
-                    }
                     WARN(e, msg[1]);
                     respond(e, [null, size, null]);
+                });
+            case 'GET_METADATA':
+                return void getMetadata(Env, msg[1], function (e, data) {
+                    WARN(e, msg[1]);
+                    respond(e, [null, data, null]);
                 });
             case 'GET_MULTIPLE_FILE_SIZE':
                 return void getMultipleFileSize(Env, msg[1], function (e, dict) {
@@ -1176,7 +1309,7 @@ RPC.create = function (config /*:Config_t*/, cb /*:(?Error, ?Function)=>void*/) 
                 });
             case 'IS_NEW_CHANNEL':
                 return void isNewChannel(Env, msg[1], function (e, isNew) {
-                    respond(null, [null, isNew, null]);
+                    respond(e, [null, isNew, null]);
                 });
             default:
                 console.error("unsupported!");
@@ -1306,7 +1439,7 @@ RPC.create = function (config /*:Config_t*/, cb /*:(?Error, ?Function)=>void*/) 
                     Respond(e, size);
                 });
             case 'UPDATE_LIMITS':
-                return void updateLimits(config, safeKey, function (e, limit) {
+                return void updateLimits(Env, config, safeKey, function (e, limit) {
                     if (e) {
                         WARN(e, limit);
                         return void Respond(e);
@@ -1341,9 +1474,14 @@ RPC.create = function (config /*:Config_t*/, cb /*:(?Error, ?Function)=>void*/) 
                 });
 
             case 'REMOVE_OWNED_CHANNEL':
-                return void removeOwnedChannel(Env, msg[1], publicKey, function (e, response) {
+                return void removeOwnedChannel(Env, msg[1], publicKey, function (e) {
                     if (e) { return void Respond(e); }
-                    Respond(void 0, response);
+                    Respond(void 0, "OK");
+                });
+            case 'REMOVE_PINS':
+                return void removePins(Env, safeKey, function (e) {
+                    if (e) { return void Respond(e); }
+                    Respond(void 0, "OK");
                 });
             // restricted to privileged users...
             case 'UPLOAD':
@@ -1369,6 +1507,12 @@ RPC.create = function (config /*:Config_t*/, cb /*:(?Error, ?Function)=>void*/) 
                 return void upload_complete(Env, safeKey, function (e, hash) {
                     WARN(e, hash);
                     Respond(e, hash);
+                });
+            case 'OWNED_UPLOAD_COMPLETE':
+                if (!privileged) { return deny(); }
+                return void owned_upload_complete(Env, safeKey, function (e, blobId) {
+                    WARN(e, blobId);
+                    Respond(e, blobId);
                 });
             case 'UPLOAD_CANCEL':
                 if (!privileged) { return deny(); }
@@ -1418,7 +1562,7 @@ RPC.create = function (config /*:Config_t*/, cb /*:(?Error, ?Function)=>void*/) 
     };
 
     var updateLimitDaily = function () {
-        updateLimits(config, undefined, function (e) {
+        updateLimits(Env, config, undefined, function (e) {
             if (e) {
                 WARN('limitUpdate', e);
             }

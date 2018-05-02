@@ -75,13 +75,7 @@ define([
             cb();
         });
     };
-    // Settings and drive
-    common.getUserObject = function (cb) {
-        postMessage("GET", [], function (obj) {
-            cb(obj);
-        });
-    };
-    // Settings and auth
+    // Settings and drive and auth
     common.getUserObject = function (cb) {
         postMessage("GET", [], function (obj) {
             cb(obj);
@@ -93,6 +87,10 @@ define([
             anonHash: LocalStore.getFSHash()
         };
         postMessage("MIGRATE_ANON_DRIVE", data, cb);
+    };
+    // Settings
+    common.deleteAccount = function (cb) {
+        postMessage("DELETE_ACCOUNT", null, cb);
     };
     // Drive
     common.userObjectCommand = function (data, cb) {
@@ -426,6 +424,7 @@ define([
         // it allows us to add owners and expiration time if it is a new file
         var parsed = Hash.parsePadUrl(href);
         if(!parsed) { throw new Error("Cannot get template hash"); }
+        postMessage("INCREMENT_TEMPLATE_USE", href);
         Crypt.get(parsed.hash, function (err, val) {
             if (err) { throw new Error(err); }
             var p = Hash.parsePadUrl(window.location.href);
@@ -467,6 +466,16 @@ define([
         postMessage("GET_SECURE_FILES_LIST", query, function (list) {
             cb(void 0, list);
         });
+    };
+    // Get a template href from its id
+    common.getPadData = function (id, cb) {
+        postMessage("GET_PAD_DATA", id, function (data) {
+            cb(void 0, data);
+        });
+    };
+    // Set initial path when creating a pad from pad creation screen
+    common.setInitialPath = function (path) {
+        postMessage("SET_INITIAL_PATH", path);
     };
 
     // Messaging (manage friends from the userlist)
@@ -538,6 +547,7 @@ define([
     pad.onJoinEvent = Util.mkEvent();
     pad.onLeaveEvent = Util.mkEvent();
     pad.onDisconnectEvent = Util.mkEvent();
+    pad.onErrorEvent = Util.mkEvent();
 
     common.getFullHistory = function (data, cb) {
         postMessage("GET_FULL_HISTORY", data, cb);
@@ -613,6 +623,12 @@ define([
         window.location.href = '/login/';
     };
 
+    common.startAccountDeletion = function (cb) {
+        // Logout other tabs
+        LocalStore.logout(null, true);
+        cb();
+    };
+
     var onMessage = function (cmd, data, cb) {
         cb = cb || function () {};
         switch (cmd) {
@@ -679,6 +695,9 @@ define([
             case 'PAD_DISCONNECT': {
                 common.padRpc.onDisconnectEvent.fire(data); break;
             }
+            case 'PAD_ERROR': {
+                common.padRpc.onErrorEvent.fire(data); break;
+            }
             // Drive
             case 'DRIVE_LOG': {
                 common.drive.onLog.fire(data); break;
@@ -688,6 +707,10 @@ define([
             }
             case 'DRIVE_REMOVE': {
                 common.drive.onRemove.fire(data); break;
+            }
+            // Account deletion
+            case 'DELETE_ACCOUNT': {
+                common.startAccountDeletion(cb); break;
             }
         }
     };
@@ -767,11 +790,11 @@ define([
 
                 if (data.anonHash && !cfg.userHash) { LocalStore.setFSHash(data.anonHash); }
 
-                if (cfg.userHash && sessionStorage) {
+                /*if (cfg.userHash && sessionStorage) {
                     // copy User_hash into sessionStorage because cross-domain iframes
                     // on safari replaces localStorage with sessionStorage or something
                     sessionStorage.setItem(Constants.userHashKey, cfg.userHash);
-                }
+                }*/
 
                 if (cfg.userHash) {
                     var localToken = tryParsing(localStorage.getItem(Constants.tokenKey));

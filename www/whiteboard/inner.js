@@ -20,7 +20,7 @@ define([
     '/bower_components/file-saver/FileSaver.min.js',
 
     'css!/bower_components/bootstrap/dist/css/bootstrap.min.css',
-    'less!/bower_components/components-font-awesome/css/font-awesome.min.css',
+    'css!/bower_components/components-font-awesome/css/font-awesome.min.css',
     'less!/customize/src/less2/main.less',
 ], function (
     $,
@@ -312,12 +312,13 @@ define([
                 return;
             }
 
-            var $color = APP.$color = $('<button>', {
-                id: "cp-app-whiteboard-color-picker",
+            var $color = APP.$color = common.createButton(null, true, {
+                icon: 'fa-square',
                 title: Messages.canvas_chooseColor,
-                'class': "fa fa-square cp-toolbar-rightside-button",
-            })
-            .on('click', function () {
+                name: 'color',
+                id: 'cp-app-whiteboard-color-picker'
+            });
+            $color.on('click', function () {
                 pickColor($color.css('background-color'), function (color) {
                     setColor(color);
                 });
@@ -345,7 +346,16 @@ define([
 
             var content = stringifyInner(canvas.toDatalessJSON());
 
-            APP.realtime.contentUpdate(content);
+            try {
+                APP.realtime.contentUpdate(content);
+            } catch (e) {
+                APP.unrecoverable = true;
+                setEditable(false);
+                APP.toolbar.errorState(true, e.message);
+                var msg = Messages.chainpadError;
+                UI.errorLoadingScreen(msg, true, true);
+                console.error(e);
+            }
         };
 
         var addImageToCanvas = function (img) {
@@ -415,6 +425,7 @@ define([
             Title.setToolbar(toolbar);
 
             var $rightside = toolbar.$rightside;
+            var $drawer = toolbar.$drawer;
 
             /* save as template */
             if (!metadataMgr.getPrivateData().isTemplate) {
@@ -428,7 +439,7 @@ define([
 
             /* add an export button */
             var $export = common.createButton('export', true, {}, saveImage);
-            $rightside.append($export);
+            $drawer.append($export);
 
             if (common.isLoggedIn()) {
                 common.createButton('savetodrive', true, {}, function () {})
@@ -449,6 +460,14 @@ define([
             });
             $rightside.append($forget);
 
+            var $properties = common.createButton('properties', true);
+            toolbar.$drawer.append($properties);
+
+            var $appContainer = $('#cp-app-whiteboard-container');
+            var helpMenu = common.createHelpMenu(['whiteboard']);
+            $appContainer.prepend(helpMenu.menu);
+            toolbar.$drawer.append(helpMenu.button);
+
             if (!readOnly) {
                 makeColorButton($rightside);
 
@@ -465,12 +484,13 @@ define([
                     };
                     reader.readAsDataURL(file);
                 };
-                common.createButton('', true)
-                    .attr('title', Messages.canvas_imageEmbed)
-                    .removeClass('fa-question').addClass('fa-file-image-o')
-                    .click(function () {
-                        $('<input>', {type:'file'}).on('change', onUpload).click();
-                    }).appendTo($rightside);
+                common.createButton('', true, {
+                    title: Messages.canvas_imageEmbed,
+                    icon: 'fa-file-image-o',
+                    name: 'embedImage'
+                }).click(function () {
+                    $('<input>', {type:'file'}).on('change', onUpload).click();
+                }).appendTo($rightside);
 
                 if (common.isLoggedIn()) {
                     var fileDialogCfg = {
@@ -489,11 +509,7 @@ define([
                         }
                     };
                     common.initFilePicker(fileDialogCfg);
-                    APP.$mediaTagButton = $('<button>', {
-                        title: Messages.filePickerButton,
-                        'class': 'cp-toolbar-rightside-button fa fa-picture-o',
-                        style: 'font-size: 17px'
-                    }).click(function () {
+                    APP.$mediaTagButton = common.createButton('mediatag', true).click(function () {
                         var pickerCfg = {
                             types: ['file'],
                             where: ['root'],
@@ -562,7 +578,12 @@ define([
 
 
                 if (readOnly) { return; }
-                if (isNew) {
+
+                var privateDat = metadataMgr.getPrivateData();
+                var skipTemp = Util.find(privateDat,
+                    ['settings', 'general', 'creation', 'noTemplate']);
+                var skipCreation = Util.find(privateDat, ['settings', 'general', 'creation', 'skip']);
+                if (isNew && (!AppConfig.displayCreationScreen || (!skipTemp && skipCreation))) {
                     common.openTemplatePicker();
                 }
             });
@@ -589,6 +610,7 @@ define([
         };
 
         config.onAbort = function () {
+            if (APP.unrecoverable) { return; }
             // inform of network disconnect
             setEditable(false);
             toolbar.failed();
@@ -596,19 +618,28 @@ define([
         };
 
         config.onConnectionChange = function (info) {
+            if (APP.unrecoverable) { return; }
             setEditable(info.state);
             if (info.state) {
                 initializing = true;
-                UI.findOKButton().click();
+                //UI.findOKButton().click();
             } else {
-                UI.alert(Messages.common_connectionLost, undefined, true);
+                //UI.alert(Messages.common_connectionLost, undefined, true);
             }
+        };
+
+        config.onError = function (err) {
+            common.onServerError(err, toolbar, function () {
+                APP.unrecoverable = true;
+                setEditable(false);
+            });
         };
 
         cpNfInner = common.startRealtime(config);
         metadataMgr = cpNfInner.metadataMgr;
 
         cpNfInner.onInfiniteSpinner(function () {
+            if (APP.unrecoverable) { return; }
             setEditable(false);
             UI.confirm(Messages.realtime_unrecoverableError, function (yes) {
                 if (!yes) { return; }
@@ -640,6 +671,10 @@ define([
                 $('body').append($div.html());
             }));
             SFCommon.create(waitFor(function (c) { APP.common = common = c; }));
+        }).nThen(function (waitFor) {
+            common.getSframeChannel().onReady(waitFor());
+        }).nThen(function (waitFor) {
+            common.handleNewFile(waitFor);
         }).nThen(function (/*waitFor*/) {
             andThen(common);
         });

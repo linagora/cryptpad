@@ -13,8 +13,6 @@ define([
     '/customize/messages.js',
     '/customize/application_config.js',
     '/bower_components/nthen/index.js',
-
-    'css!/common/tippy.css',
 ], function ($, Config, Util, Hash, Language, UI, Constants, Feedback, h, MediaTag, Clipboard,
              Messages, AppConfig, NThen) {
     var UIElements = {};
@@ -141,7 +139,7 @@ define([
     };
     var getPadProperties = function (common, data, cb) {
         var $d = $('<div>');
-        if (!data || !data.href) { return void cb(void 0, $d); }
+        if (!data || (!data.href && !data.roHref)) { return void cb(void 0, $d); }
 
         if (data.href) {
             $('<label>', {'for': 'cp-app-prop-link'}).text(Messages.editShare).appendTo($d);
@@ -237,11 +235,14 @@ define([
         var link = h('div.cp-share-modal', [
             h('label', Messages.share_linkAccess),
             h('br'),
-            h('input#cp-share-editable-true.cp-share-editable-value', {
+            UI.createRadio('cp-share-editable', 'cp-share-editable-true',
+                           Messages.share_linkEdit, true, { mark: {tabindex:1} }),
+            UI.createRadio('cp-share-editable', 'cp-share-editable-false',
+                           Messages.share_linkView, false, { mark: {tabindex:1} }),
+            /*h('input#cp-share-editable-true.cp-share-editable-value', {
                 type: 'radio',
                 name: 'cp-share-editable',
                 value: 1,
-                checked: 'checked'
             }),
             h('label', { 'for': 'cp-share-editable-true' }, Messages.share_linkEdit),
             h('input#cp-share-editable-false.cp-share-editable-value', {
@@ -249,44 +250,34 @@ define([
                 name: 'cp-share-editable',
                 value: 0
             }),
-            h('label', { 'for': 'cp-share-editable-false' }, Messages.share_linkView),
-            h('br'),
+            h('label', { 'for': 'cp-share-editable-false' }, Messages.share_linkView),*/
             h('br'),
             h('label', Messages.share_linkOptions),
             h('br'),
-            h('input#cp-share-embed', {
-                type: 'checkbox',
-                name: 'cp-share-embed'
-            }),
-            h('label', { 'for': 'cp-share-embed' }, Messages.share_linkEmbed),
+            UI.createCheckbox('cp-share-embed', Messages.share_linkEmbed, false, { mark: {tabindex:1} }),
+            UI.createCheckbox('cp-share-present', Messages.share_linkPresent, false, { mark: {tabindex:1} }),
             h('br'),
-            h('input#cp-share-present', {
-                type: 'checkbox',
-                name: 'cp-share-present'
-            }),
-            h('label', { 'for': 'cp-share-present' }, Messages.share_linkPresent),
-            h('br'),
-            h('br'),
-            UI.dialog.selectable('', { id: 'cp-share-link-preview' })
+            UI.dialog.selectable('', { id: 'cp-share-link-preview', tabindex: 1 })
         ]);
         if (!hashes.editHash) {
             $(link).find('#cp-share-editable-false').attr('checked', true);
-            $(link).find('#cp-share-editable-true').attr('disabled', true);
+            $(link).find('#cp-share-editable-true').removeAttr('checked').attr('disabled', true);
         }
         var saveValue = function () {
-            var edit = $(link).find('#cp-share-editable-true').is(':checked');
-            var embed = $(link).find('#cp-share-embed').is(':checked');
-            var present = $(link).find('#cp-share-present').is(':checked');
+            var edit = Util.isChecked($(link).find('#cp-share-editable-true'));
+            var embed = Util.isChecked($(link).find('#cp-share-embed'));
+            var present = Util.isChecked($(link).find('#cp-share-present'));
             common.setAttribute(['general', 'share'], {
                 edit: edit,
                 embed: embed,
                 present: present
             });
         };
-        var getLinkValue = function () {
-            var edit = $(link).find('#cp-share-editable-true').is(':checked');
-            var embed = $(link).find('#cp-share-embed').is(':checked');
-            var present = $(link).find('#cp-share-present').is(':checked');
+        var getLinkValue = function (initValue) {
+            var val = initValue || {};
+            var edit = initValue ? val.edit : Util.isChecked($(link).find('#cp-share-editable-true'));
+            var embed = initValue ? val.embed : Util.isChecked($(link).find('#cp-share-embed'));
+            var present = initValue ? val.present : Util.isChecked($(link).find('#cp-share-present'));
 
             var hash = (edit && hashes.editHash) ? hashes.editHash : hashes.viewHash;
             var href = origin + pathname + '#' + hash;
@@ -371,10 +362,16 @@ define([
         common.getAttribute(['general', 'share'], function (err, val) {
             val = val || {};
             if (val.edit === false) {
-                $(link).find('#cp-share-editable-false').attr('checked', true);
+                $(link).find('#cp-share-editable-false').prop('checked', true);
             }
-            if (val.embed) { $(link).find('#cp-share-embed').attr('checked', true); }
-            if (val.present) { $(link).find('#cp-share-present').attr('checked', true); }
+            else { $(link).find('#cp-share-editable-true').prop('checked', true); }
+            if (val.embed) { $(link).find('#cp-share-embed').prop('checked', true); }
+            if (val.present) { $(link).find('#cp-share-present').prop('checked', true); }
+            $(link).find('#cp-share-link-preview').val(getLinkValue(val));
+        });
+        common.getMetadataMgr().onChange(function () {
+            hashes = common.getMetadataMgr().getPrivateData().availableHashes;
+            $(link).find('#cp-share-link-preview').val(getLinkValue());
         });
         return tabs;
     };
@@ -457,12 +454,12 @@ define([
     UIElements.createButton = function (common, type, rightside, data, callback) {
         var AppConfig = common.getAppConfig();
         var button;
-        var size = "17px";
         var sframeChan = common.getSframeChannel();
+        var appType = (common.getMetadataMgr().getMetadata().type || 'pad').toUpperCase();
         switch (type) {
             case 'export':
                 button = $('<button>', {
-                    'class': 'fa fa-download',
+                    'class': 'fa fa-download cp-toolbar-icon-export',
                     title: Messages.exportButtonTitle,
                 }).append($('<span>', {'class': 'cp-toolbar-drawer-element'}).text(Messages.exportButton));
 
@@ -473,16 +470,47 @@ define([
                 break;
             case 'import':
                 button = $('<button>', {
-                    'class': 'fa fa-upload',
+                    'class': 'fa fa-upload cp-toolbar-icon-import',
                     title: Messages.importButtonTitle,
                 }).append($('<span>', {'class': 'cp-toolbar-drawer-element'}).text(Messages.importButton));
-                if (callback) {
+                /*if (data.types) {
+                    // New import button in the toolbar
+                    var importFunction = {
+                        template: function () {
+                            UIElements.openTemplatePicker(common, true);
+                        },
+                        file: function (cb) {
+                            importContent('text/plain', function (content, file) {
+                                cb(content, file);
+                            }, {accept: data ? data.accept : undefined})
+                        }
+                    };
+                    var toImport = [];
+                    Object.keys(data.types).forEach(function (importType) {
+                        if (!importFunction[importType] || !data.types[importType]) { return; }
+                        var option = h('button', importType);
+                        $(option).click(function () {
+                            importFunction[importType](data.types[importType]);
+                        });
+                        toImport.push(options);
+                    });
+
+                    button.click(common.prepareFeedback(type));
+
+                    if (toImport.length === 1) {
+                        button.click(function () { $(toImport[0]).click(); });
+                    } else {
+                        Cryptpad.alert(h('p.cp-import-container', toImport));
+                    }
+                }
+                else if (callback) {*/
+                    // Old import button, used in settings
                     button
                     .click(common.prepareFeedback(type))
                     .click(importContent('text/plain', function (content, file) {
                         callback(content, file);
                     }, {accept: data ? data.accept : undefined}));
-                }
+                //}
                 break;
             case 'upload':
                 button = $('<button>', {
@@ -514,12 +542,26 @@ define([
                 if (data.accept) { $input.attr('accept', data.accept); }
                 button.click(function () { $input.click(); });
                 break;
+            case 'importtemplate':
+                if (!AppConfig.enableTemplates) { return; }
+                if (!common.isLoggedIn()) { return; }
+                button = $('<button>', {
+                    'class': 'fa fa-upload cp-toolbar-icon-import',
+                    title: Messages.template_import,
+                }).append($('<span>', {'class': 'cp-toolbar-drawer-element'}).text(Messages.template_import));
+                button
+                .click(common.prepareFeedback(type))
+                .click(function () {
+                    UIElements.openTemplatePicker(common, true);
+                });
+                break;
             case 'template':
                 if (!AppConfig.enableTemplates) { return; }
                 if (!common.isLoggedIn()) { return; }
                 button = $('<button>', {
                     title: Messages.saveTemplateButton,
-                }).append($('<span>', {'class':'fa fa-bookmark', style: 'font:'+size+' FontAwesome'}));
+                    class: 'fa fa-bookmark cp-toolbar-icon-template'
+                });
                 if (data.rt) {
                     button
                     .click(function () {
@@ -564,36 +606,44 @@ define([
                 break;
             case 'forget':
                 button = $('<button>', {
-                    id: 'cryptpad-forget',
                     title: Messages.forgetButtonTitle,
-                    'class': "fa fa-trash cryptpad-forget",
-                    style: 'font:'+size+' FontAwesome'
+                    'class': "fa fa-trash cp-toolbar-icon-forget"
                 });
-                if (callback) {
-                    button
-                    .click(common.prepareFeedback(type))
-                    .click(function() {
-                        var msg = common.isLoggedIn() ? Messages.forgetPrompt : Messages.fm_removePermanentlyDialog;
-                        UI.confirm(msg, function (yes) {
-                            if (!yes) { return; }
-                            sframeChan.query('Q_MOVE_TO_TRASH', null, function (err) {
-                                if (err) { return void callback(err); }
-                                var cMsg = common.isLoggedIn() ? Messages.movedToTrash : Messages.deleted;
-                                UI.alert(cMsg, undefined, true);
-                                callback();
-                                return;
-                            });
+                callback = typeof callback === "function" ? callback : function () {};
+                button
+                .click(common.prepareFeedback(type))
+                .click(function() {
+                    var msg = common.isLoggedIn() ? Messages.forgetPrompt : Messages.fm_removePermanentlyDialog;
+                    UI.confirm(msg, function (yes) {
+                        if (!yes) { return; }
+                        sframeChan.query('Q_MOVE_TO_TRASH', null, function (err) {
+                            if (err) { return void callback(err); }
+                            var cMsg = common.isLoggedIn() ? Messages.movedToTrash : Messages.deleted;
+                            var msg = common.fixLinks($('<div>').html(cMsg));
+                            UI.alert(msg);
+                            callback();
+                            return;
                         });
-
                     });
-                }
+                });
                 break;
             case 'present':
                 button = $('<button>', {
                     title: Messages.presentButtonTitle,
-                    'class': "fa fa-play-circle cp-app-slide-present-button", // used in slide.js
-                    style: 'font:'+size+' FontAwesome'
+                    'class': "fa fa-play-circle cp-toolbar-icon-present", // used in slide.js
                 });
+                break;
+            case 'preview':
+                button = $('<button>', {
+                    title: Messages.previewButtonTitle,
+                    'class': "fa fa-eye cp-toolbar-icon-preview",
+                });
+                break;
+            case 'print':
+                button = $('<button>', {
+                    title: Messages.printButtonTitle,
+                    'class': "fa fa-print cp-toolbar-icon-print",
+                }).append($('<span>', {'class': 'cp-toolbar-drawer-element'}).text(Messages.printText));
                 break;
             case 'history':
                 if (!AppConfig.enableHistory) {
@@ -602,7 +652,7 @@ define([
                 }
                 button = $('<button>', {
                     title: Messages.historyButton,
-                    'class': "fa fa-history history",
+                    'class': "fa fa-history cp-toolbar-icon-history",
                 }).append($('<span>', {'class': 'cp-toolbar-drawer-element'}).text(Messages.historyText));
                 if (data.histConfig) {
                     button
@@ -616,19 +666,25 @@ define([
                 button = $('<button>', {
                     title: Messages.moreActions,
                     'class': "cp-toolbar-drawer-button fa fa-ellipsis-h",
-                    style: 'font:'+size+' FontAwesome'
                 });
+                break;
+            case 'mediatag':
+                button = $('<button>', {
+                    'class': 'fa fa-picture-o cp-toolbar-icon-mediatag',
+                    title: Messages.filePickerButton,
+                })
+                .click(common.prepareFeedback(type));
                 break;
             case 'savetodrive':
                 button = $('<button>', {
-                    'class': 'fa fa-cloud-upload',
+                    'class': 'fa fa-cloud-upload cp-toolbar-icon-savetodrive',
                     title: Messages.canvas_saveToDrive,
                 })
                 .click(common.prepareFeedback(type));
                 break;
             case 'hashtag':
                 button = $('<button>', {
-                    'class': 'fa fa-hashtag',
+                    'class': 'fa fa-hashtag cp-toolbar-icon-hashtag',
                     title: Messages.tags_title,
                 })
                 .click(common.prepareFeedback(type))
@@ -636,9 +692,8 @@ define([
                 break;
             case 'toggle':
                 button = $('<button>', {
-                    'class': 'fa fa-caret-down',
-                })
-                .click(common.prepareFeedback(type));
+                    'class': 'fa fa-caret-down cp-toolbar-icon-toggle',
+                });
                 window.setTimeout(function () {
                     button.attr('title', data.title);
                 });
@@ -647,17 +702,24 @@ define([
                     if (!isVisible) { button.addClass('fa-caret-down'); }
                     else { button.addClass('fa-caret-up'); }
                 };
-                button.click(function () {
+                button.click(function (e) {
                     data.element.toggle();
                     var isVisible = data.element.is(':visible');
                     if (callback) { callback(isVisible); }
+                    if (isVisible) {
+                        button.addClass('cp-toolbar-button-active');
+                        if (e.originalEvent) { Feedback.send('TOGGLE_SHOW_' + appType); }
+                    } else {
+                        button.removeClass('cp-toolbar-button-active');
+                        if (e.originalEvent) { Feedback.send('TOGGLE_HIDE_' + appType); }
+                    }
                     updateIcon(isVisible);
                 });
                 updateIcon(data.element.is(':visible'));
                 break;
             case 'properties':
                 button = $('<button>', {
-                    'class': 'fa fa-info-circle',
+                    'class': 'fa fa-info-circle cp-toolbar-icon-properties',
                     title: Messages.propertiesButtonTitle,
                 }).append($('<span>', {'class': 'cp-toolbar-drawer-element'})
                 .text(Messages.propertiesButton))
@@ -673,11 +735,24 @@ define([
                 });
                 break;
             default:
+                data = data || {};
+                var icon = data.icon || "fa-question";
                 button = $('<button>', {
-                    'class': "fa fa-question",
-                    style: 'font:'+size+' FontAwesome'
+                    'class': "fa " + icon,
                 })
-                .click(common.prepareFeedback(type));
+                .click(common.prepareFeedback(data.name || 'DEFAULT'));
+                if (data.title) { button.attr('title', data.title); }
+                if (data.style) { button.attr('style', data.style); }
+                if (data.id) { button.attr('id', data.id); }
+                if (data.hiddenReadOnly) { button.addClass('cp-hidden-if-readonly'); }
+                if (data.name) {
+                    button.addClass('cp-toolbar-icon-'+data.name);
+                    button.click(common.prepareFeedback(data.name));
+                }
+                if (data.text) {
+                    $('<span>', {'class': 'cp-toolbar-drawer-element'}).text(data.text)
+                        .appendTo(button);
+                }
         }
         if (rightside) {
             button.addClass('cp-toolbar-rightside-button');
@@ -813,6 +888,7 @@ define([
         var tbState = true;
         common.getAttribute(['general', 'markdown-help'], function (e, data) {
             if (e) { return void console.error(e); }
+            if ($(window).height() < 800 && $(window).width() < 800) { return; }
             if (data === true && $toolbarButton.length && tbState) {
                 $toolbarButton.click();
             }
@@ -829,6 +905,7 @@ define([
             }
             common.getAttribute(['general', 'markdown-help'], function (e, data) {
                 if (e) { return void console.error(e); }
+                if ($(window).height() < 800 && $(window).width() < 800) { return; }
                 if (data === true && $toolbarButton) {
                     // Show the toolbar using the button to make sure the icon in the button is
                     // correct (caret-down / caret-up)
@@ -846,6 +923,80 @@ define([
             toolbar: $toolbar,
             button: $toolbarButton,
             setState: setState
+        };
+    };
+
+    UIElements.createHelpMenu = function (common, categories) {
+        var type = common.getMetadataMgr().getMetadata().type || 'pad';
+
+        var setHTML = function (e, html) {
+            e.innerHTML = html;
+            return e;
+        };
+
+        var elements = [];
+        if (Messages.help && Messages.help.generic) {
+            Object.keys(Messages.help.generic).forEach(function (el) {
+                elements.push(setHTML(h('li'), Messages.help.generic[el]));
+            });
+        }
+        if (categories) {
+            categories.forEach(function (cat) {
+                var msgs = Messages.help[cat];
+                if (msgs) {
+                    Object.keys(msgs).forEach(function (el) {
+                        elements.push(setHTML(h('li'), msgs[el]));
+                    });
+                }
+            });
+        }
+
+        var text = h('p.cp-help-text', [
+            h('h1', Messages.help.title),
+            h('ul', elements)
+        ]);
+
+        common.fixLinks(text);
+
+        var closeButton = h('span.cp-help-close.fa.fa-window-close');
+        var $toolbarButton = common.createButton('', true, {
+            title: Messages.hide_help_button,
+            text: Messages.help_button,
+            name: 'help'
+        }).addClass('cp-toolbar-button-active');
+        var help = h('div.cp-help-container', [
+            closeButton,
+            text
+        ]);
+
+        var toggleHelp = function (forceClose) {
+            if ($(help).hasClass('cp-help-hidden')) {
+                if (forceClose) { return; }
+                common.setAttribute(['hideHelp', type], false);
+                $toolbarButton.addClass('cp-toolbar-button-active');
+                $toolbarButton.attr('title', Messages.hide_help_button);
+                return void $(help).removeClass('cp-help-hidden');
+            }
+            $toolbarButton.removeClass('cp-toolbar-button-active');
+            $toolbarButton.attr('title', Messages.show_help_button);
+            $(help).addClass('cp-help-hidden');
+            common.setAttribute(['hideHelp', type], true);
+        };
+
+        $(closeButton).click(function () { toggleHelp(true); });
+        $toolbarButton.click(function () {
+            toggleHelp();
+        });
+
+        common.getAttribute(['hideHelp', type], function (err, val) {
+            if ($(window).height() < 800 && $(window).width() < 800) { return void toggleHelp(true); }
+            if (val === true) { toggleHelp(true); }
+        });
+
+        return {
+            menu: help,
+            button: $toolbarButton,
+            text: text
         };
     };
 
@@ -1022,7 +1173,7 @@ define([
         // so we can just use those and only check for errors
         var $container = $('<span>', {'class':'cp-limit-container'});
         var todo = function (err, data) {
-            if (err) { return void console.error(err); }
+            if (err || !data) { return void console.error(err || 'No data'); }
 
             var usage = data.usage;
             var limit = data.limit;
@@ -1296,50 +1447,51 @@ define([
                 tag: 'a',
                 attributes: {
                     'target': '_blank',
-                    'href': origin+'/drive/'
+                    'href': origin+'/drive/',
+                    'class': 'fa fa-hdd-o'
                 },
-                content: Messages.login_accessDrive
+                content: h('span', Messages.login_accessDrive)
             });
         }
         // Add the change display name button if not in read only mode
         if (config.changeNameButtonCls && config.displayChangeName && !AppConfig.disableProfile) {
             options.push({
                 tag: 'a',
-                attributes: {'class': config.changeNameButtonCls},
-                content: Messages.user_rename
+                attributes: {'class': config.changeNameButtonCls + ' fa fa-user'},
+                content: h('span', Messages.user_rename)
             });
         }
         if (accountName && !AppConfig.disableProfile) {
             options.push({
                 tag: 'a',
-                attributes: {'class': 'cp-toolbar-menu-profile'},
-                content: Messages.profileButton
+                attributes: {'class': 'cp-toolbar-menu-profile fa fa-user-circle'},
+                content: h('span', Messages.profileButton)
             });
         }
         if (padType !== 'settings') {
             options.push({
                 tag: 'a',
-                attributes: {'class': 'cp-toolbar-menu-settings'},
-                content: Messages.settingsButton
+                attributes: {'class': 'cp-toolbar-menu-settings fa fa-cog'},
+                content: h('span', Messages.settingsButton)
             });
         }
         // Add login or logout button depending on the current status
         if (accountName) {
             options.push({
                 tag: 'a',
-                attributes: {'class': 'cp-toolbar-menu-logout'},
-                content: Messages.logoutButton
+                attributes: {'class': 'cp-toolbar-menu-logout fa fa-sign-out'},
+                content: h('span', Messages.logoutButton)
             });
         } else {
             options.push({
                 tag: 'a',
-                attributes: {'class': 'cp-toolbar-menu-login'},
-                content: Messages.login_login
+                attributes: {'class': 'cp-toolbar-menu-login fa fa-sign-in'},
+                content: h('span', Messages.login_login)
             });
             options.push({
                 tag: 'a',
-                attributes: {'class': 'cp-toolbar-menu-register'},
-                content: Messages.login_register
+                attributes: {'class': 'cp-toolbar-menu-register fa fa-user-plus'},
+                content: h('span', Messages.login_register)
             });
         }
         var $icon = $('<span>', {'class': 'fa fa-user-secret'});
@@ -1395,9 +1547,8 @@ define([
                 UIElements.displayAvatar(Common, $avatar, url,
                         newName || Messages.anonymous, function ($img) {
                     oldUrl = url;
-                    if ($img) {
-                        $userAdmin.find('> button').addClass('cp-avatar');
-                    }
+                    $userAdmin.find('> button').removeClass('cp-avatar');
+                    if ($img) { $userAdmin.find('> button').addClass('cp-avatar'); }
                     loadingAvatar = false;
                 });
                 return;
@@ -1483,6 +1634,7 @@ define([
         if (!$blockContainer.length) {
             $blockContainer = $('<div>', {
                 'class': 'cp-modal-container',
+                tabindex: 1,
                 'id': cfg.id
             });
         }
@@ -1514,25 +1666,26 @@ define([
             $body: $('body')
         });
         var $title = $('<h3>').text(Messages.fm_newFile);
-        var $description = $('<p>').text(Messages.creation_newPadModalDescription);
+        var $description = $('<p>').html(Messages.creation_newPadModalDescription);
         $modal.find('.cp-modal').append($title);
         $modal.find('.cp-modal').append($description);
 
         var $advanced;
 
         var $advancedContainer = $('<div>');
-        if (common.isLoggedIn()) {
-            $advanced = $('<input>', {
-                type: 'checkbox',
-                checked: 'checked',
-                id: 'cp-app-toolbar-creation-advanced'
-            }).appendTo($advancedContainer);
-            $('<label>', {
-                for: 'cp-app-toolbar-creation-advanced'
-            }).text(Messages.creation_newPadModalAdvanced).appendTo($advancedContainer);
+        var priv = common.getMetadataMgr().getPrivateData();
+        var c = (priv.settings.general && priv.settings.general.creation) || {};
+        if (AppConfig.displayCreationScreen && common.isLoggedIn() && c.skip) {
+            var $cboxLabel = $(UI.createCheckbox('cp-app-toolbar-creation-advanced',
+                                                 Messages.creation_newPadModalAdvanced, true))
+                                 .appendTo($advancedContainer);
+            $advanced = $cboxLabel.find('input');
+            $description.append('<br>');
+            $description.append(Messages.creation_newPadModalDescriptionAdvanced);
         }
 
         var $container = $('<div>');
+        var i = 0;
         AppConfig.availablePadTypes.forEach(function (p) {
             if (p === 'drive') { return; }
             if (p === 'contacts') { return; }
@@ -1541,15 +1694,16 @@ define([
             if (!common.isLoggedIn() && AppConfig.registeredOnlyTypes &&
                 AppConfig.registeredOnlyTypes.indexOf(p) !== -1) { return; }
             var $element = $('<li>', {
-                'class': 'cp-icons-element'
+                'class': 'cp-icons-element',
+                'id': 'cp-newpad-icons-'+ (i++)
             }).prepend(UI.getIcon(p)).appendTo($container);
             $element.append($('<span>', {'class': 'cp-icons-name'})
                 .text(Messages.type[p]));
             $element.attr('data-type', p);
             $element.click(function () {
                 $modal.hide();
-                if ($advanced && $advanced.is(':checked')) {
-                    common.sessionStorage.put(Constants.displayPadCreationScreen, true, function () {
+                if ($advanced && Util.isChecked($advanced)) {
+                    common.sessionStorage.put(Constants.displayPadCreationScreen, true, function (){
                         common.openURL('/' + p + '/');
                     });
                     return;
@@ -1560,11 +1714,41 @@ define([
             });
         });
 
+        var selected = -1;
+        var next = function () {
+            selected = ++selected % 5;
+            $container.find('.cp-icons-element-selected').removeClass('cp-icons-element-selected');
+            $container.find('#cp-newpad-icons-'+selected).addClass('cp-icons-element-selected');
+        };
 
-        /*var $content = createNewPadIcons($modal, isInRoot);*/
+        $modal.off('keydown');
+        $modal.keydown(function (e) {
+            if (e.which === 9) {
+                e.preventDefault();
+                e.stopPropagation();
+                next();
+                return;
+            }
+            if (e.which === 13) {
+                if ($container.find('.cp-icons-element-selected').length === 1) {
+                    $container.find('.cp-icons-element-selected').click();
+                }
+                return;
+            }
+            if (e.which === 32 && $advanced) {
+                $advanced.prop('checked', !$advanced.prop('checked'));
+                $modal.focus();
+                e.stopPropagation();
+                e.preventDefault();
+            }
+        });
+
+
         $modal.find('.cp-modal').append($container).append($advancedContainer);
-        window.setTimeout(function () { $modal.show(); });
-        //addNewPadHandlers($modal, isInRoot);
+        window.setTimeout(function () {
+            $modal.show();
+            $modal.focus();
+        });
     };
 
     UIElements.initFilePicker = function (common, cfg) {
@@ -1579,16 +1763,20 @@ define([
         sframeChan.event("EV_FILE_PICKER_OPEN", types);
     };
 
-    UIElements.openTemplatePicker = function (common) {
+    UIElements.openTemplatePicker = function (common, force) {
         var metadataMgr = common.getMetadataMgr();
         var type = metadataMgr.getMetadataLazy().type;
         var sframeChan = common.getSframeChannel();
         var focus;
 
-        var pickerCfg = {
+        var pickerCfgInit = {
             types: [type],
             where: ['template'],
             hidden: true
+        };
+        var pickerCfg = {
+            types: [type],
+            where: ['template'],
         };
         var onConfirm = function (yes) {
             if (!yes) {
@@ -1617,18 +1805,22 @@ define([
 
         sframeChan.query("Q_TEMPLATE_EXIST", type, function (err, data) {
             if (data) {
-                common.openFilePicker(pickerCfg);
+                common.openFilePicker(pickerCfgInit);
                 focus = document.activeElement;
+                if (force) { return void onConfirm(true); }
                 UI.confirm(Messages.useTemplate, onConfirm, {
                     ok: Messages.useTemplateOK,
                     cancel: Messages.useTemplateCancel,
                 });
+            } else if (force) {
+                UI.alert(Messages.template_empty);
             }
         });
     };
 
     UIElements.setExpirationValue = function (val, $expire) {
         if (val && typeof (val) === "number") {
+            $expire.find('#cp-creation-expire').attr('checked', true).trigger('change');
             $expire.find('#cp-creation-expire-true').attr('checked', true);
             if (val % (3600 * 24 * 30) === 0) {
                 $expire.find('#cp-creation-expire-unit').val("month");
@@ -1655,110 +1847,240 @@ define([
         var metadataMgr = common.getMetadataMgr();
         var type = metadataMgr.getMetadataLazy().type;
 
-        // XXX check text for pad creation screen + translate it in French
-
         var $body = $('body');
         var $creationContainer = $('<div>', { id: 'cp-creation-container' }).appendTo($body);
-        var $creation = $('<div>', { id: 'cp-creation' }).appendTo($creationContainer);
-
-        var setHTML = function (e, html) {
-            e.innerHTML = html;
-            return e;
-        };
+        var urlArgs = (Config.requireConf && Config.requireConf.urlArgs) || '';
+        var l = h('div.cp-creation-logo', h('img', { src: '/customize/loading-logo.png?' + urlArgs }));
+        $(l).appendTo($creationContainer);
+        var $creation = $('<div>', { id: 'cp-creation', tabindex: 1 }).appendTo($creationContainer);
 
         // Title
-        $creation.append(h('h1.cp-creation-title', Messages['button_new'+type]));
+        //var colorClass = 'cp-icon-color-'+type;
+        //$creation.append(h('h2.cp-creation-title', Messages.newButtonTitle));
+        $creation.append(h('h3.cp-creation-title', Messages['button_new'+type]));
+        //$creation.append(h('h2.cp-creation-title.'+colorClass, Messages.newButtonTitle));
 
         // Deleted pad warning
         if (metadataMgr.getPrivateData().isDeleted) {
-            $creation.append(h('div.cp-creation-deleted', Messages.creation_404));
+            $creation.append(h('div.cp-creation-deleted-container',
+                h('div.cp-creation-deleted', Messages.creation_404)
+            ));
         }
 
-        var createHelper = function (text) {
-            var q = h('span.cp-creation-help.fa.fa-question', {
-                title: text
+        var origin = common.getMetadataMgr().getPrivateData().origin;
+        var createHelper = function (href, text) {
+            var q = h('a.cp-creation-help.fa.fa-question-circle', {
+                title: text,
+                href: origin + href,
+                target: "_blank",
+                'data-tippy-placement': "right"
             });
             return q;
         };
 
         // Owned pads
+        // Default is Owned pad
         var owned = h('div.cp-creation-owned', [
-            h('h2', [
-                Messages.creation_ownedTitle,
-                createHelper(Messages.creation_owned1 + '\n' + Messages.creation_owned2)
-            ]),
-            setHTML(h('p'), Messages.creation_owned1 + '<br>' + Messages.creation_owned2),
-            h('input#cp-creation-owned-true.cp-creation-owned-value', {
-                type: 'radio',
-                name: 'cp-creation-owned',
-                value: 1,
-                checked: 'checked'
-            }),
-            h('label', { 'for': 'cp-creation-owned-true' }, Messages.creation_ownedTrue),
-            h('input#cp-creation-owned-false.cp-creation-owned-value', {
-                type: 'radio',
-                name: 'cp-creation-owned',
-                value: 0
-            }),
-            h('label', { 'for': 'cp-creation-owned-false' }, Messages.creation_ownedFalse)
+            UI.createCheckbox('cp-creation-owned', Messages.creation_owned, true),
+            createHelper('/faq.html#keywords-owned', Messages.creation_owned1)
         ]);
-        $creation.append(owned);
-
-        // If set to "open pad" or not set, check "open pad"
-        if (!cfg.owned && typeof cfg.owned !== "undefined") {
-            $creation.find('#cp-creation-owned-false').attr('checked', true);
-        }
 
         // Life time
         var expire = h('div.cp-creation-expire', [
-            h('h2', [
-                Messages.creation_expireTitle,
-                createHelper(Messages.creation_expire1, Messages.creation_expire2)
-            ]),
-            setHTML(h('p'), Messages.creation_expire1 + '<br>' + Messages.creation_expire2),
-            h('input#cp-creation-expire-false.cp-creation-expire-value', {
-                type: 'radio',
-                name: 'cp-creation-expire',
-                value: 0,
-                checked: 'checked'
-            }),
-            h('label', { 'for': 'cp-creation-expire-false' }, Messages.creation_expireFalse),
-            h('input#cp-creation-expire-true.cp-creation-expire-value', {
-                type: 'radio',
-                name: 'cp-creation-expire',
-                value: 1
-            }),
-            h('label', { 'for': 'cp-creation-expire-true' }, [
-                Messages.creation_expireTrue,
-                h('span.cp-creation-expire-picker', [
-                    h('input#cp-creation-expire-val', {
-                        type: "number",
-                        min: 1,
-                        max: 100,
-                        value: 3
-                    }),
-                    h('select#cp-creation-expire-unit', [
-                        h('option', { value: 'hour' }, Messages.creation_expireHours),
-                        h('option', { value: 'day' }, Messages.creation_expireDays),
-                        h('option', {
-                            value: 'month',
-                            selected: 'selected'
-                        }, Messages.creation_expireMonths)
-                    ])
+            UI.createCheckbox('cp-creation-expire', Messages.creation_expire, false),
+            h('span.cp-creation-expire-picker.cp-creation-slider', [
+                h('input#cp-creation-expire-val', {
+                    type: "number",
+                    min: 1,
+                    max: 100,
+                    value: 3
+                }),
+                h('select#cp-creation-expire-unit', [
+                    h('option', { value: 'hour' }, Messages.creation_expireHours),
+                    h('option', { value: 'day' }, Messages.creation_expireDays),
+                    h('option', {
+                        value: 'month',
+                        selected: 'selected'
+                    }, Messages.creation_expireMonths)
                 ])
+            ]),
+            createHelper('/faq.html#keywords-expiring', Messages.creation_expire2),
+        ]);
+
+        var right = h('span.fa.fa-chevron-right.cp-creation-template-more');
+        var left = h('span.fa.fa-chevron-left.cp-creation-template-more');
+        var templates = h('div.cp-creation-template', [
+            left,
+            h('div.cp-creation-template-container', [
+                h('span.fa.fa-circle-o-notch.fa-spin.fa-4x.fa-fw')
+            ]),
+            right
+        ]);
+
+        var settings = h('div.cp-creation-remember', [
+            UI.createCheckbox('cp-creation-remember', Messages.creation_saveSettings, false),
+            createHelper('/settings/#creation', Messages.creation_settings),
+            h('div.cp-creation-remember-help.cp-creation-slider', [
+                h('span.fa.fa-exclamation-circle.cp-creation-warning'),
+                Messages.creation_rememberHelp
             ])
         ]);
-        $creation.append(expire);
 
+        var createDiv = h('div.cp-creation-create');
+        var $create = $(createDiv);
+
+        $(h('div#cp-creation-form', [
+            owned,
+            expire,
+            settings,
+            templates,
+            createDiv
+        ])).appendTo($creation);
+
+        // Display templates
+
+        var selected = 0; // Selected template in the list (highlighted)
+        var TEMPLATES_DISPLAYED = 4; // Max templates displayed per page
+        var next = function () {}; // Function called when pressing tab to highlight the next template
+        var i = 0; // Index of the first template displayed in the current page
+        sframeChan.query("Q_CREATE_TEMPLATES", type, function (err, res) {
+            if (!res.data || !Array.isArray(res.data)) {
+                return void console.error("Error: get the templates list");
+            }
+            var allData = res.data.slice().sort(function (a, b) {
+                if (a.used === b.used) {
+                    // Sort by name
+                    if (a.name === b.name) { return 0; }
+                    return a.name < b.name ? -1 : 1;
+                }
+                return b.used - a.used;
+            });
+            allData.unshift({
+                name: Messages.creation_newTemplate,
+                id: -1,
+                icon: h('span.fa.fa-bookmark')
+            });
+            allData.unshift({
+                name: Messages.creation_noTemplate,
+                id: 0,
+                icon: h('span.fa.fa-file')
+            });
+            var redraw = function (index) {
+                if (index < 0) { i = 0; }
+                else if (index > allData.length - 1) { return; }
+                else { i = index; }
+                var data = allData.slice(i, i + TEMPLATES_DISPLAYED);
+                var $container = $(templates).find('.cp-creation-template-container').html('');
+                data.forEach(function (obj, idx) {
+                    var name = obj.name;
+                    var $span = $('<span>', {
+                        'class': 'cp-creation-template-element',
+                        'title': name,
+                    }).appendTo($container);
+                    $span.data('id', obj.id);
+                    if (idx === selected) { $span.addClass('cp-creation-template-selected'); }
+                    $span.append(obj.icon || UI.getFileIcon({type: type}));
+                    $('<span>', {'class': 'cp-creation-template-element-name'}).text(name)
+                        .appendTo($span);
+                    $span.click(function () {
+                        $container.find('.cp-creation-template-selected')
+                            .removeClass('cp-creation-template-selected');
+                        $span.addClass('cp-creation-template-selected');
+                        selected = idx;
+                    });
+
+                    // Add thumbnail if it exists
+                    if (obj.thumbnail) {
+                        common.addThumbnail(obj.thumbnail, $span, function () {});
+                    }
+                });
+                $(right).off('click').removeClass('hidden').click(function () {
+                    selected = 0;
+                    redraw(i + TEMPLATES_DISPLAYED);
+                });
+                if (i >= allData.length - TEMPLATES_DISPLAYED ) { $(right).addClass('hidden'); }
+                $(left).off('click').removeClass('hidden').click(function () {
+                    selected = TEMPLATES_DISPLAYED - 1;
+                    redraw(i - TEMPLATES_DISPLAYED);
+                });
+                if (i < TEMPLATES_DISPLAYED) { $(left).addClass('hidden'); }
+            };
+            redraw(0);
+
+            // Change template selection when Tab is pressed
+            next = function (revert) {
+                var max = $creation.find('.cp-creation-template-element').length;
+                if (selected + 1 === max && !revert) {
+                    selected = i + TEMPLATES_DISPLAYED < allData.length ? 0 : max;
+                    return void redraw(i + TEMPLATES_DISPLAYED);
+                }
+                if (selected === 0 && revert) {
+                    selected = i - TEMPLATES_DISPLAYED >= 0 ? TEMPLATES_DISPLAYED - 1 : 0;
+                    return void redraw(i - TEMPLATES_DISPLAYED);
+                }
+                selected = revert ?
+                            (--selected < 0 ? 0 : selected) :
+                            ++selected >= max ? max-1 : selected;
+                $creation.find('.cp-creation-template-element')
+                    .removeClass('cp-creation-template-selected');
+                $($creation.find('.cp-creation-template-element').get(selected))
+                    .addClass('cp-creation-template-selected');
+            };
+
+        });
+
+        // Display expiration form when checkbox checked
+        $creation.find('#cp-creation-expire').on('change', function () {
+            if ($(this).is(':checked')) {
+                $creation.find('.cp-creation-expire-picker:not(.active)').addClass('active');
+                $creation.find('.cp-creation-expire:not(.active)').addClass('active');
+                $creation.find('#cp-creation-expire-val').focus();
+                return;
+            }
+            $creation.find('.cp-creation-expire-picker').removeClass('active');
+            $creation.find('.cp-creation-expire').removeClass('active');
+            $creation.focus();
+        });
+
+        // Display settings help when checkbox checked
+        $creation.find('#cp-creation-remember').on('change', function () {
+            if ($(this).is(':checked')) {
+                $creation.find('.cp-creation-remember-help:not(.active)').addClass('active');
+                return;
+            }
+            $creation.find('.cp-creation-remember-help').removeClass('active');
+            $creation.focus();
+        });
+
+        // Keyboard shortcuts
+        $creation.find('#cp-creation-expire-val').keydown(function (e) {
+            if (e.which === 9) {
+                e.stopPropagation();
+            }
+        });
+        $creation.find('#cp-creation-expire-unit').keydown(function (e) {
+            if (e.which === 9 && e.shiftKey) {
+                e.stopPropagation();
+            }
+        });
+
+
+        // Initial values
+        if (!cfg.owned && typeof cfg.owned !== "undefined") {
+            $creation.find('#cp-creation-owned').prop('checked', false);
+        }
+        if (cfg.skip) {
+            $creation.find('#cp-creation-remember').prop('checked', true).trigger('change');
+        }
         UIElements.setExpirationValue(cfg.expire, $creation);
 
         // Create the pad
-        var create = function (template) {
+        var getFormValues = function () {
             // Type of pad
-            var ownedVal = parseInt($('input[name="cp-creation-owned"]:checked').val());
+            var ownedVal = $('#cp-creation-owned').is(':checked') ? 1 : 0;
             // Life time
             var expireVal = 0;
-            if(parseInt($('input[name="cp-creation-expire"]:checked').val())) {
+            if($('#cp-creation-expire').is(':checked')) {
                 var unit = 0;
                 switch ($('#cp-creation-expire-unit').val()) {
                     case "hour" : unit = 3600;           break;
@@ -1769,60 +2091,78 @@ define([
                 expireVal = ($('#cp-creation-expire-val').val() || 0) * unit;
             }
 
-            common.createPad({
+            var $template = $creation.find('.cp-creation-template-selected');
+            var templateId = $template.data('id') || undefined;
+
+            return {
                 owned: ownedVal,
                 expire: expireVal,
-                template: template
-            }, function () {
-                $creationContainer.remove();
+                templateId: templateId
+            };
+        };
+        var create = function () {
+            var val = getFormValues();
+
+            var skip = $('#cp-creation-remember').is(':checked');
+            common.setAttribute(['general', 'creation', 'skip'], skip, function (e) {
+                if (e) { return void console.error(e); }
+            });
+            common.setAttribute(['general', 'creation', 'noTemplate'], skip, function (e) {
+                if (e) { return void console.error(e); }
+            });
+
+            common.setAttribute(['general', 'creation', 'owned'], val.owned, function (e) {
+                if (e) { return void console.error(e); }
+            });
+            common.setAttribute(['general', 'creation', 'expire'], val.expire, function (e) {
+                if (e) { return void console.error(e); }
+            });
+
+            $creationContainer.remove();
+            common.createPad(val, function () {
                 cb();
             });
         };
 
-        var $create = $(h('div.cp-creation-create', [
-            h('h2', Messages.creation_createTitle)
-        ])).appendTo($creation);
-        // Pick a template?
-        sframeChan.query("Q_TEMPLATE_EXIST", type, function (err, data) {
-            if (!data) { return; }
-            var $templateButton = $('<button>').text(Messages.creation_createFromTemplate)
-                                               .appendTo($create);
 
-            var pickerCfg = {
-                types: [type],
-                where: ['template'],
-                hidden: true
-            };
-            common.openFilePicker(pickerCfg);
-
-            $templateButton.click(function () {
-                // Show the template picker
-                delete pickerCfg.hidden;
-                common.openFilePicker(pickerCfg);
-                var first = true; // We can only pick a template once (for a new document)
-                var fileDialogCfg = {
-                    onSelect: function (data) {
-                        if (data.type === type && first) {
-                            create(data.href);
-                            first = false;
-                        }
-                    }
-                };
-                common.initFilePicker(fileDialogCfg);
-            });
-        });
-
-        var $button = $('<button>').text(Messages.creation_createFromScratch).appendTo($create);
+        var $button = $('<button>').text(Messages.creation_create).appendTo($create);
+        $button.addClass('cp-creation-button-selected');
         $button.click(function () {
             create();
         });
 
-        // Settings button
-        var origin = common.getMetadataMgr().getPrivateData().origin;
-        $(h('div.cp-creation-settings', h('a', {
-            href: origin + '/settings/#creation',
-            target: '_blank'
-        }, Messages.creation_settings))).appendTo($creation);
+        $creation.keydown(function (e) {
+            if (e.which === 9) {
+                e.preventDefault();
+                e.stopPropagation();
+                next(e.shiftKey);
+                return;
+            }
+            if (e.which === 13) {
+                $button.click();
+                return;
+            }
+        });
+        $creation.focus();
+    };
+
+    UIElements.onServerError = function (common, err, toolbar, cb) {
+        if (["EDELETED", "EEXPIRED"].indexOf(err.type) === -1) { return; }
+        var msg = err.type;
+        if (err.type === 'EEXPIRED') {
+            msg = Messages.expiredError;
+            if (err.loaded) {
+                msg += Messages.errorCopy;
+            }
+        } else if (err.type === 'EDELETED') {
+            msg = Messages.deletedError;
+            if (err.loaded) {
+                msg += Messages.errorCopy;
+            }
+        }
+        if (toolbar && typeof toolbar.deleted === "function") { toolbar.deleted(); }
+        UI.errorLoadingScreen(msg, true, true);
+        (cb || function () {})();
     };
 
     return UIElements;
