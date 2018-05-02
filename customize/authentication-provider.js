@@ -3,7 +3,8 @@ define([
     '/common/common-constants.js',
 ], function (Realtime, Constants) {
     var AuthenticationProvider = {},
-        isRegistering;
+        isRegistering,
+        shouldImportPads;
 
     /**
      * Currently it seems we need to do all this on top of the register process 
@@ -43,7 +44,7 @@ define([
     function triggerRegistration(Login, LocalStore, Me, callback) {
         isRegistering = true;
 
-        Login.loginOrRegister(Me.email, Me.pkey, isRegistering, function(err, result) {
+        Login.loginOrRegister(Me.email, Me.pkey, isRegistering, shouldImportPads, function(err, result) {
             if (err) {
                 // UNHANDLED ERROR
                 console.log("Error: ", err);
@@ -62,8 +63,9 @@ define([
             '/api/me'
         ], function (Login, LocalStore, Me) {
             isRegistering = false;
+            shouldImportPads = false;
 
-            Login.loginOrRegister(Me.email, Me.pkey, isRegistering, function(err, result) {
+            Login.loginOrRegister(Me.email, Me.pkey, isRegistering, shouldImportPads, function(err, result) {
                 var loginFollowup = continueLoginWhenSuccessful.bind(this, LocalStore, Me, done);
                 if (!err) {
                     return loginFollowup(result);
