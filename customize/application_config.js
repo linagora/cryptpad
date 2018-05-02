@@ -66,6 +66,9 @@ define([
       if (!padTitle) { return; }
 
       var titleSplitted = padTitle.split(" ");
+
+      if (titleSplitted[titleSplitted.length - 2] !== ">") { return; };
+
       var meetingId = titleSplitted[titleSplitted.length - 1];
 
       var data = {
