@@ -61,12 +61,18 @@ define([
   AppConfig.textAnalyzer = function (getter, padMetadataMgr, id) {
     Delta(getter, function (words) {
       if (!words.length) { return; }
+
+      var padTitle = padMetadataMgr.getMetadata().title;
+      if (!padTitle) { return; }
+
+      var titleSplitted = padTitle.split(" ");
+      var meetingId = titleSplitted[titleSplitted.length - 1];
+
       var data = {
           words: words,
-          id: padMetadataMgr.getMetadata().title,
+          id: meetingId,
       };
 
-      console.log(data);
       $.ajax({
         type: 'POST',
         url: ServerConfig.wordExtractionServerUrl,
