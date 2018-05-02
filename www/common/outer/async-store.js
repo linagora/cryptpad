@@ -1,4 +1,5 @@
 define([
+    'json.sortify',
     '/common/userObject.js',
     '/common/migrate-user-object.js',
     '/common/common-hash.js',
@@ -15,9 +16,11 @@ define([
     '/bower_components/chainpad-crypto/crypto.js?v=0.1.5',
     '/bower_components/chainpad/chainpad.dist.js',
     '/bower_components/chainpad-listmap/chainpad-listmap.js',
-], function (UserObject, Migrate, Hash, Util, Constants, Feedback, Realtime, Messaging, Messenger,
+    '/bower_components/nthen/index.js',
+    '/bower_components/saferphore/index.js',
+], function (Sortify, UserObject, Migrate, Hash, Util, Constants, Feedback, Realtime, Messaging, Messenger,
              CpNfWorker, NetConfig, AppConfig,
-             Crypto, ChainPad, Listmap) {
+             Crypto, ChainPad, Listmap, nThen, Saferphore) {
     var Store = {};
 
     var postMessage = function () {};
@@ -69,8 +72,16 @@ define([
         var userChannel = userParsedHash && userParsedHash.channel;
         if (!userChannel) { return null; }
 
-        var list = store.userObject.getFiles([store.userObject.FILES_DATA]).map(function (id) {
-                return Hash.hrefToHexChannelId(store.userObject.getFileData(id).href);
+        // Get the list of pads' channel ID in your drive
+        // This list is filtered so that it doesn't include pad owned by other users (you should
+        // not pin these pads)
+        var files = store.userObject.getFiles([store.userObject.FILES_DATA]);
+        var edPublic = store.proxy.edPublic;
+        var list = files.map(function (id) {
+                var d = store.userObject.getFileData(id);
+                if (d.owners && d.owners.length && edPublic &&
+                    d.owners.indexOf(edPublic) === -1) { return; }
+                return Hash.hrefToHexChannelId(d.href);
             })
             .filter(function (x) { return x; });
 
@@ -369,10 +380,11 @@ define([
 
     // Get the metadata for sframe-common-outer
     Store.getMetadata = function (data, cb) {
+        var disableThumbnails = Util.find(store.proxy, ['settings', 'general', 'disableThumbnails']);
         var metadata = {
             // "user" is shared with everybody via the userlist
             user: {
-                name: store.proxy[Constants.displayNameKey],
+                name: store.proxy[Constants.displayNameKey] || "",
                 uid: store.proxy.uid,
                 avatar: Util.find(store.proxy, ['profile', 'avatar']),
                 profile: Util.find(store.proxy, ['profile', 'view']),
@@ -383,7 +395,7 @@ define([
                 edPublic: store.proxy.edPublic,
                 friends: store.proxy.friends || {},
                 settings: store.proxy.settings,
-                thumbnails: !Util.find(store.proxy, ['settings', 'general', 'disableThumbnails'])
+                thumbnails: disableThumbnails === false
             }
         };
         cb(JSON.parse(JSON.stringify(metadata)));
@@ -409,6 +421,98 @@ define([
             var path = data.path || ['root'];
             store.userObject.add(id, path);
             onSync(cb);
+        });
+    };
+
+    var getOwnedPads = function () {
+        var list = [];
+        store.userObject.getFiles([store.userObject.FILES_DATA]).forEach(function (id) {
+            var data = store.userObject.getFileData(id);
+            var edPublic = store.proxy.edPublic;
+
+            // Push channels owned by someone else or channel that should have expired
+            // because of the expiration time
+            if (data.owners && data.owners.length === 1 && data.owners.indexOf(edPublic) !== -1) {
+                list.push(Hash.hrefToHexChannelId(data.href));
+            }
+        });
+        if (store.proxy.todo) {
+            list.push(Hash.hrefToHexChannelId('/todo/#' + store.proxy.todo));
+        }
+        if (store.proxy.profile && store.proxy.profile.edit) {
+            list.push(Hash.hrefToHexChannelId('/profile/#' + store.proxy.profile.edit));
+        }
+        return list;
+    };
+    var removeOwnedPads = function (waitFor) {
+        // Delete owned pads
+        var ownedPads = getOwnedPads();
+        var sem = Saferphore.create(10);
+        ownedPads.forEach(function (c) {
+            var w = waitFor();
+            sem.take(function (give) {
+                Store.removeOwnedChannel(c, give(function (obj) {
+                    if (obj && obj.error) { console.error(obj.error); }
+                    w();
+                }));
+            });
+        });
+    };
+
+    Store.deleteAccount = function (data, cb) {
+        var edPublic = store.proxy.edPublic;
+        var secret = Hash.getSecrets('drive', storeHash);
+        Store.anonRpcMsg({
+            msg: 'GET_METADATA',
+            data: secret.channel
+        }, function (data) {
+            var metadata = data[0];
+            // Owned drive
+            if (metadata && metadata.owners && metadata.owners.length === 1 &&
+                metadata.owners.indexOf(edPublic) !== -1) {
+                nThen(function (waitFor) {
+                    var token = Math.floor(Math.random()*Number.MAX_SAFE_INTEGER);
+                    store.proxy[Constants.tokenKey] = token;
+                    postMessage("DELETE_ACCOUNT", token, waitFor());
+                }).nThen(function (waitFor) {
+                    removeOwnedPads(waitFor);
+                }).nThen(function (waitFor) {
+                    // Delete Pin Store
+                    store.rpc.removePins(waitFor(function (err) {
+                        if (err) { console.error(err); }
+                    }));
+                }).nThen(function (waitFor) {
+                    // Delete Drive
+                    Store.removeOwnedChannel(secret.channel, waitFor());
+                }).nThen(function () {
+                    store.network.disconnect();
+                    cb({
+                        state: true
+                    });
+                });
+                return;
+            }
+
+            // Not owned drive
+            var toSign = {
+                intent: 'Please delete my account.'
+            };
+            toSign.drive = secret.channel;
+            toSign.edPublic = edPublic;
+            var signKey = Crypto.Nacl.util.decodeBase64(store.proxy.edPrivate);
+            var proof = Crypto.Nacl.sign.detached(Crypto.Nacl.util.decodeUTF8(Sortify(toSign)), signKey);
+
+            var check = Crypto.Nacl.sign.detached.verify(Crypto.Nacl.util.decodeUTF8(Sortify(toSign)),
+                proof,
+                Crypto.Nacl.util.decodeBase64(edPublic));
+
+            if (!check) { console.error('signed message failed verification'); }
+
+            var proofTxt = Crypto.Nacl.util.encodeBase64(proof);
+            cb({
+                proof: proofTxt,
+                toSign: JSON.parse(Sortify(toSign))
+            });
         });
     };
 
@@ -489,8 +593,12 @@ define([
 
     // Reset the drive part of the userObject (from settings)
     Store.resetDrive = function (data, cb) {
-        store.proxy.drive = store.fo.getStructure();
-        onSync(cb);
+        nThen(function (waitFor) {
+            removeOwnedPads(waitFor);
+        }).nThen(function () {
+            store.proxy.drive = store.fo.getStructure();
+            onSync(cb);
+        });
     };
 
     /**
@@ -551,6 +659,15 @@ define([
             res.push(JSON.parse(JSON.stringify(data)));
         });
         cb(res);
+    };
+    Store.incrementTemplateUse = function (href) {
+        store.userObject.getPadAttribute(href, 'used', function (err, data) {
+            // This is a not critical function, abort in case of error to make sure we won't
+            // create any issue with the user object or the async store
+            if (err) { return; }
+            var used = typeof data === "number" ? ++data : 1;
+            store.userObject.setPadAttribute(href, 'used', used);
+        });
     };
 
     // Pads
@@ -678,6 +795,13 @@ define([
         });
         cb(list);
     };
+    Store.getPadData = function (id, cb) {
+        cb(store.userObject.getFileData(id));
+    };
+    Store.setInitialPath = function (path) {
+        if (!store.data) { return; }
+        store.data.initialPath = path;
+    };
 
     // Messaging (manage friends from the userlist)
     var getMessagingCfg = function () {
@@ -803,8 +927,12 @@ define([
                 channel.data = padData || {};
                 postMessage("PAD_READY");
             }, // post EV_PAD_READY
-            onMessage: function (m) {
-                postMessage("PAD_MESSAGE", m);
+            onMessage: function (user, m, validateKey) {
+                postMessage("PAD_MESSAGE", {
+                    user: user,
+                    msg: m,
+                    validateKey: validateKey
+                });
             }, // post EV_PAD_MESSAGE
             onJoin: function (m) {
                 postMessage("PAD_JOIN", m);
@@ -815,6 +943,9 @@ define([
             onDisconnect: function () {
                 postMessage("PAD_DISCONNECT");
             }, // post EV_PAD_DISCONNECT
+            onError: function (err) {
+                postMessage("PAD_ERROR", err);
+            }, // post EV_PAD_ERROR
             channel: data.channel,
             validateKey: data.validateKey,
             owners: data.owners,
@@ -870,7 +1001,7 @@ define([
             if (parsed[1][3] !== data.channel) { return; }
             msg = parsed[1][4];
             if (msg) {
-                msg = msg.replace(/^cp\|/, '');
+                msg = msg.replace(/cp\|(([A-Za-z0-9+\/=]+)\|)?/, '');
                 //var decryptedMsg = crypto.decrypt(msg, true);
                 msgs.push(msg);
             }
@@ -894,7 +1025,7 @@ define([
             case 'addFolder':
                 store.userObject.addFolder(data.path, data.name, cb); break;
             case 'delete':
-                store.userObject.delete(data.paths, cb, data.nocheck); break;
+                store.userObject.delete(data.paths, cb, data.nocheck, data.isOwnPadRemoved); break;
             case 'emptyTrash':
                 store.userObject.emptyTrash(cb); break;
             case 'rename':

@@ -34,6 +34,10 @@ define(['json.sortify'], function (Sortify) {
             }
             if (!metadataObj.users) { metadataObj.users = {}; }
             if (!metadataLazyObj.users) { metadataLazyObj.users = {}; }
+
+            if (!metadataObj.type) { metadataObj.type = meta.doc.type; }
+            if (!metadataLazyObj.type) { metadataLazyObj.type = meta.doc.type; }
+
             var mdo = {};
             // We don't want to add our user data to the object multiple times.
             //var containsYou = false;
@@ -111,6 +115,12 @@ define(['json.sortify'], function (Sortify) {
             change(false);
         });
         sframeChan.on('EV_RT_DISCONNECT', function () {
+            members = [];
+            if (!meta.user) { return; }
+            change(true);
+        });
+        sframeChan.on('EV_RT_ERROR', function (err) {
+            if (err.type !== 'EEXPIRED' && err.type !== 'EDELETED') { return; }
             members = [];
             if (!meta.user) { return; }
             change(true);

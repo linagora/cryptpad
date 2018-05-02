@@ -22,29 +22,36 @@ define(function () {
     out.button_newslide = 'New Presentation';
     out.button_newwhiteboard = 'New Whiteboard';
 
-    // NOTE: We want to update the 'common_connectionLost' key.
-    // Please do not add a new 'updated_common_connectionLostAndInfo' but change directly the value of 'common_connectionLost'
+    // NOTE: Remove updated_0_ if we need an updated_1_
     out.updated_0_common_connectionLost = "<b>Server Connection Lost</b><br>You're now in read-only mode until the connection is back.";
     out.common_connectionLost = out.updated_0_common_connectionLost;
 
     out.websocketError = 'Unable to connect to the websocket server...';
     out.typeError = "This pad is not compatible with the selected application";
-    out.onLogout = 'You are logged out, <a href="/" target="_blank">click here</a> to log in<br>or press <em>Escape</em> to access your pad in read-only mode.';
+    out.onLogout = 'You are logged out, {0}click here{1} to log in<br>or press <em>Escape</em> to access your pad in read-only mode.';
     out.wrongApp = "Unable to display the content of that realtime session in your browser. Please try to reload that page.";
-    out.padNotPinned = 'This pad will expire in 3 months, {0}login{1} or {2}register{3} to preserve it.';
+    out.padNotPinned = 'This pad will expire after 3 months of inactivity, {0}login{1} or {2}register{3} to preserve it.';
     out.anonymousStoreDisabled = "The webmaster of this CryptPad instance has disabled the store for anonymous users. You have to log in to be able to use CryptDrive.";
+    out.expiredError = 'This pad has reached its expiration time and is no longer available.';
+    out.deletedError = 'This pad has been deleted by its owner and is no longer available.';
+    out.inactiveError = 'This pad has been deleted due to inactivity. Press Esc to create a new pad.';
+    out.chainpadError = 'A critical error occurred when updating your content. This page is in read-only mode to make sure you won\'t lose your work.<br>' +
+                        'Hit <em>Esc</em> to continue to view this pad, or reload to try editing again.';
+    out.errorCopy = ' You can still copy the content to another location by pressing <em>Esc</em>.<br>Once you leave this page, it will disappear forever!';
+    out.errorRedirectToHome = 'Press <em>Esc</em> to be redirected to your CryptDrive.';
 
     out.loading = "Loading...";
     out.error = "Error";
     out.saved = "Saved";
     out.synced = "Everything is saved";
     out.deleted = "Pad deleted from your CryptDrive";
+    out.deletedFromServer = "Pad deleted from the server";
 
     out.realtime_unrecoverableError = "The realtime engine has encountered an unrecoverable error. Click OK to reload.";
 
     out.disconnected = 'Disconnected';
     out.synchronizing = 'Synchronizing';
-    out.reconnecting = 'Reconnecting...';
+    out.reconnecting = 'Reconnecting';
     out.typing = "Editing";
     out.initializing = "Initializing...";
     out.forgotten = 'Moved to the trash';
@@ -140,6 +147,8 @@ define(function () {
     out.useTemplate = "Start with a template?"; //Would you like to "You have available templates for this type of pad. Do you want to use one?";
     out.useTemplateOK = 'Pick a template (Enter)';
     out.useTemplateCancel = 'Start fresh (Esc)';
+    out.template_import = "Import a template";
+    out.template_empty = "No template available";
 
     out.previewButtonTitle = "Display or hide the Markdown preview mode";
 
@@ -216,6 +225,10 @@ define(function () {
     out.cancelButton = 'Cancel (esc)';
     out.doNotAskAgain = "Don't ask me again (Esc)";
 
+    out.show_help_button = "Show help";
+    out.hide_help_button = "Hide help";
+    out.help_button = "Help";
+
     out.historyText = "History";
     out.historyButton = "Display the document history";
     out.history_next = "Go to the next version";
@@ -275,9 +288,6 @@ define(function () {
     out.poll_edit = "Edit";
     out.poll_locked = "Locked";
     out.poll_unlocked = "Unlocked";
-
-    out.poll_show_help_button = "Show help";
-    out.poll_hide_help_button = "Hide help";
 
     out.poll_bookmark_col = 'Bookmark this column so that it is always unlocked and displayed at the beginning for you';
     out.poll_bookmarked_col = 'This is your bookmarked column. It will always be unlocked and displayed at the beginning for you.';
@@ -539,6 +549,13 @@ define(function () {
     out.settings_userFeedbackHint2 = "Your pad's content will never be shared with the server.";
     out.settings_userFeedback = "Enable user feedback";
 
+    out.settings_deleteTitle = "Account deletion";
+    out.settings_deleteHint = "Account deletion is permanent. Your CryptDrive and your list of pads will be deleted from the server. The rest of your pads will be deleted in 90 days if nobody else has stored them in their CryptDrive.";
+    out.settings_deleteButton = "Delete your account";
+    out.settings_deleteModal = "Share the following information with your CryptPad administrator in order to have your data removed from their server.";
+    out.settings_deleteConfirm = "Clicking OK will delete your account permanently. Are you sure?";
+    out.settings_deleted = "Your user account is now deleted. Press OK to go to the home page.";
+
     out.settings_anonymous = "You are not logged in. Settings here are specific to this browser.";
     out.settings_publicSigningKey = "Public Signing Key";
 
@@ -600,9 +617,6 @@ define(function () {
     // pad
     out.pad_showToolbar = "Show toolbar";
     out.pad_hideToolbar = "Hide toolbar";
-
-    // general warnings
-    out.warn_notPinned = "This pad is not in anyone's CryptDrive. It will expire after 3 months. <a href='/about.html#pinning'>Learn more...</a>";
 
     // markdown toolbar
     out.mdToolbar_button = "Show or hide the Markdown toolbar";
@@ -756,6 +770,213 @@ define(function () {
     out.features_f_storage_anon = "Pads deleted after 3 months";
     out.features_f_storage_registered = "Free: 50MB<br>Premium: 5GB/20GB/50GB";
 
+    // faq.html
+
+    out.faq_link = "FAQ";
+    out.faq_title = "Frequently Asked Questions";
+    out.faq_whatis = "What is CryptPad?";
+    out.faq = {};
+    out.faq.keywords = {
+        title: 'Keywords',
+        pad: {
+            q: "What is a pad?",
+            a: "<em>Pad</em> is a term popularized by <a href='http://etherpad.org/' target='_blank'>Etherpad</a>, a real-time collaborative editor.\n" +
+            "It refers to a document that you can edit in your browser, generally with other people's changes visible nearly instantly."
+        },
+        owned: {
+            q: "What is an owned Pad?",
+            a: "An <em>owned pad</em> is a pad created with an explicit <em>owner</em>, identified to the server by their <em>public signing key</em>." +
+            " A pad's owner may choose to delete their pads from the server, making it unavailable to other collaborators in the future, whether they had it in their CryptDrive or not."
+        },
+        expiring: {
+            q: "What is an expiring Pad?",
+            a: "An <em>expiring pad</em> is a pad created with a set time at which it will be automatically removed from the server." +
+                " Expiring pads can be configured to last anywhere from one hour to one hundred months." +
+                " The pad and all of its history will become permanently unavailable even if it is being edited at the time that it expires.<br><br>" +
+                "If a pad is set to expire, you can check its expiration time by viewing its <em>properties</em>, either by right-clicking the pad in your CryptDrive, or by using the <em>properties</em> sub-menu from an application's toolbar."
+        },
+        tag: {
+            q: "How can I use tags?",
+            a: "You can tag pads and uploaded files via your CryptDrive, or using the <em>tag</em> button (<span class='fa fa-hashtag'></span>) in any editor's toolbar." +
+            " Search for pads and files in your CryptDrive using the search bar with a term beginning with hashtag, like <em>#crypto</em>."
+        },
+        template: {
+            q: "What is a template?",
+            a: "A template is a pad which can be used to define to initial content for another pad of the same type when you create it." +
+            " Any existing pad can be turned into a template by moving it into the <em>Templates</em> section in your CryptDrive." +
+            " You can also create a copy of a pad to be used as a template by clicking the template button (<span class='fa fa-bookmark'></span>) in the editor's toolbar."
+        },
+    };
+    out.faq.privacy = {
+        title: 'Privacy',
+        different: {
+            q: "How is CryptPad different from other Pad services?",
+            a: "CryptPad encrypts changes to your pads before sending that information to be stored on the server, so we can't read what you're typing."
+        },
+        me: {
+            q: "What information does the server know about me?",
+            a: "Server administrators are able to see the IP addresses of people who visit the CryptPad." +
+            " We don't record which addresses visit which pads, but we could, even though we don't have access to the decrypted content of those pads." +
+            " If you are worried about us analyzing that information, it's safest to assume that we do collect it, since we can't prove that we don't.<br><br>" +
+
+            "We collect some basic telemetry about how people use CryptPad, such as the size of the screen on their device, and which buttons they click the most." +
+            "This helps us improve the software, but if you'd prefer not to send such information to the server, you can <strong>opt out by unchecking the <em>Enable user feedback</em> checkbox</strong>.<br><br>" +
+
+            "We do keep track of which pads are in a user's CryptDrive so that we can impose storage limits, but we don't know the content or type of those pads." +
+            " Storage quotas are associated with a user's public key, but we don't associate names or emails with those public keys.<br><br>" +
+
+            " For more information, you can read this <a href='https://blog.cryptpad.fr/2017/07/07/cryptpad-analytics-what-we-cant-know-what-we-must-know-what-we-want-to-know/' target='_blank'>blog post</a> which we wrote about the topic."
+        },
+        register: {
+            q: "Does the server know more about me if I register?",
+            a: "We don't require users to verify their email address, and the server does not even learn your username or password when you register." +
+            " Instead, the register and login forms generate a unique keyring from your input, and the server only learns your cryptographic signature." +
+            " We use this information to track details like how much data you are using, which allows us to restrict each user to a quota.<br><br>" +
+
+            "We use our <em>feedback</em> functionality to inform the server that someone with your IP has registered an account." +
+            " We use this to measure how many people register for CryptPad accounts, and to see what regions they are in so that we can guess which languages may need better support.<br><br>" +
+
+            "When you register, you generate a public key which is used to tell the server that the pads in your CryptDrive should not be deleted even if they are not actively being used." +
+            " This information does reveal more about how you are using CryptPad, but the system allows us to remove pads from the server once nobody cares enough to keep them."
+        },
+        other: {
+            q: "What can other collaborators learn about me?",
+            a: "When you edit a pad with someone else, you communicate through the server, so only we learn your IP address." +
+            " Other users can see your display name, avatar, the link to your profile (if you have one), and your <em>public key</em> (which is used for encrypting communications between each other)."
+        },
+        anonymous: {
+            q: "Does CryptPad make me anonymous?",
+            a: "Even though CryptPad is designed to know as little about you as possible, it does not provide strong anonymity." +
+            " Our servers have access to your IP address, however, you can hide this information by using Tor to access CryptPad." +
+            " Using Tor without changing your behaviour will not guarantee you anonymity, as the server is also able to identify users by their unique cryptographic identifier." +
+            " If you use the same account when you're not using Tor, it will be possible to deanonymize your session.<br><br>" +
+
+            "For users who require a lesser degree of privacy, CryptPad does not require users to identify themselves by name, phone number, or email address like many other services."
+        },
+        policy: {
+            q: "Do you have a data privacy policy?",
+            a: "Yes! It is available <a href='/privacy.html' target='_blank'>here</a>."
+        }
+    };
+    out.faq.security = {
+        title: 'Security',
+        proof: {
+            q: "How do you use Zero Knowledge Proofs?",
+            a: "When we use the term <em>Zero Knowledge</em>, we are not referring to <em>Zero Knowledge proofs</em>, but to <em>Zero Knowledge Web Services</em>." +
+            " <em>Zero Knowledge Web Services</em> encrypt user data in the user's browser, without the server ever having access to the unencrypted data, or the encryption keys.<br><br>" +
+            "We've compiled a short list of Zero Knowledge services <a href='https://blog.cryptpad.fr/2017/02/20/Time-to-Encrypt-the-Cloud/#Other-Zero-Knowledge-Services'>here</a>."
+        },
+        why: {
+            q: "Why should I use CryptPad?",
+            a: "Our position is that cloud services should not require access to your data in order for you to share it with your friends and colleagues." +
+            " If you are using another service to collaborate, and they do not explicitly say that they can't access your information, it is very likely that they are leveraging it for profit."
+        },
+        compromised: {
+            q: "Does CryptPad protect me if my device is compromised?",
+            a: "In the event that your device is stolen, CryptPad allows you to trigger a remote logout of all devices except the one you are currently using." +
+            " To do so, go to your <strong>settings page</strong> and click <strong>Log out everywhere</strong>." +
+            " All other devices which are currently connected to the account will log out." +
+            " Any previously connected devices which visit CryptPad will log out as soon as they load the page.<br><br>" +
+
+            "Currently, <em>remote logout</em> is implemented in the browser, not in conjunction with the server." +
+            " As such, it may not protect you from government agencies, but it should be sufficient if you forgot to log out after using CryptPad from a shared computer."
+        },
+        crypto: {
+            q: "What cryptography do you use?",
+            a: "CryptPad is based upon two open-source cryptography libraries: <a href='https://github.com/dchest/tweetnacl-js' target='_blank'>tweetnacl.js</a> and <a href='https://github.com/dchest/scrypt-async-js' target='_blank'>scrypt-async.js</a>.<br><br>" +
+
+            "Scrypt is a <em>password-based key derivation algorithm</em>. We use it to turn your username and password into a unique keyring which secures access to your CryptDrive such that only you can access your list of pads.<br><br>" +
+
+            "We use the <em>xsalsa20-poly1305</em> and <em>x25519-xsalsa20-poly1305</em> cyphers provided by tweetnacl to encrypt pads and chat history, respectively."
+        }
+    };
+    out.faq.usability = {
+        title: 'Usability',
+        register: {
+            q: "What do I get by registering?",
+            a: "Registered users have access to a number of features unavailable to unregistered users. There's a chart <a href='/features.html' target='_blank'>here</a>."
+        },
+        share: {
+            q: "How can I share encrypted pads with my friends?",
+            a: "CryptPad puts the secret encryption key to your pad after the <em>#</em> character in the URL." +
+            " Anything after this character is not sent to the server, so we never have access to your encryption keys." +
+            " By sharing the link to a pad, you share the ability to read and access it."
+        },
+        remove: {
+            q: "I removed a pad or file from my CryptDrive, but the content is still available. How can I remove it?",
+            a: "Only <em>owned pads</em> (introduced in February 2018) can be deleted. Additionally, these pads can only be deleted by their <em>owners</em> (the person that originally created the pad)." +
+            " If you are not the creator of the pad, you will have to ask its owner to delete it for you." +
+            " For pads you do own, you can <strong>right-click the pad in your CryptDrive</strong>, and choose <strong>Delete from the server</strong>."
+        },
+        forget: {
+            q: "What if I forget my password?",
+            a: "Unfortunately, if we could recover access to your encrypted pads for you, we'd be able to access them ourselves." +
+            " If you did not record your username and password anywhere, and cannot remember either, you may be able to recover your pads by filtering your browser's history."
+        },
+        change: {
+            q: "What if I want to change my password?",
+            a: "It is not currently possible to change your CryptPad password, though we are planning to develop this functionality very soon."
+        },
+        devices: {
+            q: "I am logged in on two devices, and see two different CryptDrives, how is this possible?",
+            a: "It's probable that you registered the same name twice, using different passwords." +
+            " Because the CryptPad server identifies you by your cryptographic signature and not your name, it cannot prevent others from registering with the same name." +
+            " As such, each user account has a unique username and password combination." +
+            " Logged in users can see their username at the top of the settings page."
+        },
+        folder: {
+            q: "Can I share entire folders from my CryptDrive?",
+            a: "We're working on adding support for <em>\"workgroups\"</em>, which would allow collaborators to share a folder structure, and all the pads contained within that structure."
+        },
+        feature: {
+            q: "Can you add a very special feature which I need?",
+            a: "Many of the features in CryptPad exist because users asked for them." +
+            " Our <a href='https://cryptpad.fr/contact.html' target='_blank'>contacts page</a> lists the ways that you can reach us.<br><br>" +
+
+            "Unfortunately, we cannot guarantee that we will implement everything that people ask for." +
+            " If a particular feature is critical for your organization, you can sponsor development time to ensure its completion." +
+            " Please contact <a href='mailto:sales@cryptpad.fr' target='_blank'>sales@cryptpad.fr</a> for more information.<br><br>" +
+
+            "Even if you cannot afford to sponsor development, we're interested in feedback that can help us improve CryptPad." +
+            " Feel free to contact us with via the above methods any time."
+        },
+    };
+    out.faq.other = {
+        title: "Other questions",
+        pay: {
+            q: "Why should I pay when so many features are free?",
+            a: "We give supporters additional storage and the ability to increase their friends' quotas (<a href='https://accounts.cryptpad.fr/#/faq' target='_blank'>learn more</a>).<br><br>" +
+
+            "Beyond these short term benefits, by subscribing with a premium account you help to fund continued, active development of CryptPad. That includes fixing bugs, adding new features, and making it easier for others to help host CryptPad themselves." +
+            " Additionally, you help to prove to other service providers that people are willing to support privacy enhancing technologies. It is our hope that eventually business models based on selling user data will become a thing of the past.<br><br>" +
+
+            "Finally, we offer most of CryptPad's functionality for free because we believe everyone deserves personal privacy, not just those with disposable income." +
+            " By supporting us, you help us continue to make it possible for underprivileged populations to access these basic features without a price tag attached."
+        },
+        goal: {
+            q: "What is your goal?",
+            a: "By developing privacy-respecting collaboration technology, we wish to raise users' expectations of privacy from cloud-computing platforms." +
+            " We hope that our work drives other service providers in all domains to match or exceed our efforts." +
+            " Despite our optimism, we know that much of the web is funded by revenue from targeted advertising." +
+            " There is much more work to be done than we can manage ourselves, and we appreciate the promotion, support, and contributions of our community towards this goal."
+        },
+        jobs: {
+            q: "Are you hiring?",
+            a: "Yes! Please introduce yourself with an email to <a href='mailto:jobs@xwiki.com' target='_blank'>jobs@xwiki.com</a>."
+        },
+        host: {
+            q: "Can you help me set up my own instance of CryptPad?",
+            a: "We are happy to provide support for your organization's internal CryptPad installation. Please contact <a href='mailto:sales@cryptpad.fr' target='_blank'>sales@cryptpad.fr</a> for more information."
+        },
+        revenue: {
+            q: "How can I participate in the revenue sharing?",
+            a: " If you are running your own instance of CryptPad, and would like to enable paid accounts and split the revenue with the developers, your server will need to be configured as a partner service.<br><br>" +
+
+            "In your CryptPad directory, <em>config.example.js</em> should contain an explanation of what you need to configure on your server." +
+            " You will need to contact <a href='mailto:sales@cryptpad.fr'>sales@cryptpad.fr</a> to verify that your server is configured to use HTTPS correctly, and discuss payment methods."
+        },
+    };
+
     // terms.html
 
     out.tos_title = "CryptPad Terms of Service";
@@ -775,26 +996,62 @@ define(function () {
 
     // Header.html
 
-    out.header_france = '<a href="http://www.xwiki.com/" target="_blank" rel="noopener noreferrer">With <img class="bottom-bar-heart" src="/customize/heart.png" alt="love" /> from <img class="bottom-bar-fr" src="/customize/fr.png" title="France" alt="France"/> by <img src="/customize/logo-xwiki.png" alt="XWiki SAS" class="bottom-bar-xwiki"/></a>';
-
-    out.header_support = '<a href="http://ng.open-paas.org/" title="OpenPaaS::ng" target="_blank" rel="noopener noreferrer"> <img src="/customize/openpaasng.png" alt="OpenPaaS-ng" class="bottom-bar-openpaas" /></a>';
     out.updated_0_header_logoTitle = 'Go to your CryptDrive';
     out.header_logoTitle = out.updated_0_header_logoTitle;
     out.header_homeTitle = 'Go to CryptPad homepage';
 
     // Initial states
 
+    out.help = {};
+
+    out.help.title = "Getting started";
+    out.help.generic = {
+        more: 'Learn more about how CryptPad can work for you by reading our <a href="/faq.html" target="_blank">FAQ</a>',
+        share: 'Use the share menu (<span class="fa fa-share-alt"></span>) to generate a link so collaborators can view or edit this pad',
+        stored: 'Every pad you visit is automatically stored in your <a href="/drive/" target="_blank">CryptDrive</a>',
+    };
+
+    out.help.text = {
+        formatting: 'You can display or hide the text formatting toolbar by clicking the <span class="fa fa-caret-down"></span> or <span class="fa fa-caret-up"></span> buttons',
+        embed: 'Registered users can embed an image or a file stored in their CryptDrive using <span class="fa fa-image"></span>',
+        history: 'You can use <em>history</em> <span class="fa fa-history"></span> to view or restore previous versions',
+    };
+
+    out.help.pad = {
+        export: 'You can export the content as PDF using the <span class="fa fa-print"></span> button in the text formatting toolbar',
+    };
+
+    out.help.code = {
+        modes: 'Use the dropdown menus in the <span class="fa fa-ellipsis-h"></span> submenu to change syntax highlighting modes or color themes',
+    };
+
+    out.help.slide = {
+        markdown: 'Write slides in <a href="http://www.markdowntutorial.com/">Markdown</a> and separate them with a line containing <code>---</code>',
+        present: 'Start the presentation using the <span class="fa fa-play-circle"></span> button',
+        settings: 'Change the slide settings (background, transitions, page numbers, etc.) with the <span class="fa fa-cog"></span> button in the <span class="fa fa-ellipsis-h"></span> submenu',
+        colors: 'Change the text and background colors using the <span class="fa fa-i-cursor"></span> and <span class="fa fa-square"></span> buttons',
+    };
+
+    out.help.poll = {
+        decisions: 'Make decisions in private among trusted friends',
+        options: 'Propose options, and express your preferences',
+        choices: 'Click cells in your column to cycle through yes (<strong>✔</strong>), maybe (<strong>~</strong>), or no (<strong>✖</strong>)',
+        submit: 'Click <strong>submit</strong> to make your choices visible to others',
+    };
+
+    out.help.whiteboard = {
+        colors: 'Double-click colors to modify your palette',
+        mode: 'Disable draw mode to drag and stretch strokes',
+        embed: 'Embed images from your disk <span class="fa fa-file-image-o"></span> or your CryptDrive <span class="fa fa-image"></span> and export them as PNG to your disk <span class="fa fa-download"></span> or your CryptDrive <span class="fa fa-cloud-upload"></span>'
+    };
+
+
     out.initialState = [
         '<p>',
         'This is&nbsp;<strong>CryptPad</strong>, the Zero Knowledge realtime collaborative editor. Everything is saved as you type.',
         '<br>',
-        'Share the link to this pad to edit with friends or use the <span class="fa fa-share-alt" style="border: 1px solid black;color:#000;">&nbsp;Share&nbsp;</span> button to share a <em>read-only link</em>&nbsp;which allows viewing but not editing.',
+        'Share the link to this pad to edit with friends or use the <span class="fa fa-share-alt"></span> button to share a <em>read-only link</em>&nbsp;which allows viewing but not editing.',
         '</p>',
-
-        '<p><em>',
-        'Go ahead, just start typing...',
-        '</em></p>',
-        '<p>&nbsp;<br></p>'
     ].join('');
 
     out.codeInitialState = [
@@ -806,14 +1063,6 @@ define(function () {
 
     out.slideInitialState = [
         '# CryptSlide\n',
-        '* This is a zero knowledge realtime collaborative editor.\n',
-        '* What you type here is encrypted so only people who have the link can access it.\n',
-        '* Even the server cannot see what you type.\n',
-        '* What you see here, what you hear here, when you leave here, let it stay here.\n',
-        '\n',
-        '---',
-        '\n',
-        '# How to use\n',
         '1. Write your slides content using markdown syntax\n',
         '  - Learn more about markdown syntax [here](http://www.markdowntutorial.com/)\n',
         '2. Separate your slides with ---\n',
@@ -862,24 +1111,28 @@ define(function () {
     out.feedback_optout = "If you would like to opt out, visit <a href='/settings/'>your user settings page</a>, where you'll find a checkbox to enable or disable user feedback";
 
     // Creation page
-    out.creation_404 = "This pad not longer exists. Use the following form to create a new pad";
+    out.creation_404 = "This pad not longer exists. Use the following form to create a new pad.";
     out.creation_ownedTitle = "Type of pad";
-    out.creation_ownedTrue = "Owned pad";
+    out.creation_owned = "Owned pad"; // Creation page
+    out.creation_ownedTrue = "Owned pad"; // Settings
     out.creation_ownedFalse = "Open pad";
-    out.creation_owned1 = "An <b>owned</b> pad is a pad that you can delete from the server whenever you want. Once it is deleted, no one else can access it, even if it is stored in their CryptDrive.";
+    out.creation_owned1 = "An <b>owned</b> pad can be deleted from the server whenever the owner wants. Deleting an owned pad removes it from other users' CryptDrives.";
     out.creation_owned2 = "An <b>open</b> pad doesn't have any owner and thus, it can't be deleted from the server unless it has reached its expiration time.";
     out.creation_expireTitle = "Life time";
+    out.creation_expire = "Expiring pad";
     out.creation_expireTrue = "Add a life time";
     out.creation_expireFalse = "Unlimited";
-    out.creation_expireHours = "Hours";
-    out.creation_expireDays = "Days";
-    out.creation_expireMonths = "Months";
-    out.creation_expire1 = "By default, a pad stored by a registered user will never be removed from the server, unless it is requested by its owner.";
-    out.creation_expire2 = "If you prefer, you can set a life time to make sure the pad will be permanently deleted from the server and unavailable after the specified date.";
-    out.creation_createTitle = "Create a pad";
-    out.creation_createFromTemplate = "From template";
-    out.creation_createFromScratch = "From scratch";
-    out.creation_settings = "New Pad settings";
+    out.creation_expireHours = "Hour(s)";
+    out.creation_expireDays = "Day(s)";
+    out.creation_expireMonths = "Month(s)";
+    out.creation_expire1 = "An <b>unlimited</b> pad will not be removed from the server until its owner deletes it.";
+    out.creation_expire2 = "An <b>expiring</b> pad has a set lifetime, after which it will be automatically removed from the server and other users' CryptDrives.";
+    out.creation_noTemplate = "No template";
+    out.creation_newTemplate = "New template";
+    out.creation_create = "Create";
+    out.creation_saveSettings = "Don't show this again";
+    out.creation_settings = "View more settings";
+    out.creation_rememberHelp = "Visit your Settings page to reset this preference";
     // Properties about creation data
     out.creation_owners = "Owners";
     out.creation_ownedByOther = "Owned by another user";
@@ -887,7 +1140,8 @@ define(function () {
     out.creation_expiration = "Expiration time";
     out.creation_propertiesTitle = "Availability";
     out.creation_appMenuName = "Advanced mode (Ctrl + E)";
-    out.creation_newPadModalDescription = "Click on a pad type to create it. You can check the box if you want to display the pad creation screen (for owned pad, expiration pad, etc.).";
+    out.creation_newPadModalDescription = "Click on a pad type to create it. You can also press <b>Tab</b> to select the type and press <b>Enter</b> to confirm.";
+    out.creation_newPadModalDescriptionAdvanced = "You can check the box (or press <b>Space</b> to change its value) if you want to display the pad creation screen (for owned pads, expiring pads, etc.).";
     out.creation_newPadModalAdvanced = "Display the pad creation screen";
 
     // New share modal

@@ -21,10 +21,25 @@ try {
 var websocketPort = config.websocketPort || config.httpPort;
 var useSecureWebsockets = config.useSecureWebsockets || false;
 
+// This is stuff which will become available to replify
+const debuggableStore = new WeakMap();
+const debuggable = function (name, x) {
+    if (name in debuggableStore) {
+        try { throw new Error(); } catch (e) {
+            console.error('cannot add ' + name + ' more than once [' + e.stack + ']');
+        }
+    } else {
+        debuggableStore[name] = x;
+    }
+    return x;
+};
+debuggable('global', global);
+debuggable('config', config);
+
 // support multiple storage back ends
 var Storage = require(config.storage||'./storage/file');
 
-var app = Express();
+var app = debuggable('app', Express());
 
 var httpsOpts;
 
@@ -107,6 +122,9 @@ app.get(mainPagePattern, Express.static(__dirname + '/customize.dist'));
 
 app.use("/blob", Express.static(Path.join(__dirname, (config.blobPath || './blob')), {
     maxAge: DEV_MODE? "0d": "365d"
+}));
+app.use("/datastore", Express.static(Path.join(__dirname, (config.filePath || './datastore')), {
+    maxAge: "0d"
 }));
 
 app.use("/customize", Express.static(__dirname + '/customize'));
@@ -197,6 +215,7 @@ var custom_four04_path = Path.resolve(__dirname + '/customize/404.html');
 var send404 = function (res, path) {
     if (!path && path !== four04_path) { path = four04_path; }
     Fs.exists(path, function (exists) {
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
         if (exists) { return Fs.createReadStream(path).pipe(res); }
         send404(res);
     });
@@ -229,7 +248,6 @@ var rpc;
 var nt = nThen(function (w) {
     if (!config.enableTaskScheduling) { return; }
     var Tasks = require("./storage/tasks");
-
     console.log("loading task scheduler");
     Tasks.create(config, w(function (e, tasks) {
         config.tasks = tasks;
@@ -239,7 +257,7 @@ var nt = nThen(function (w) {
     if (typeof(config.rpc) !== 'string') { return; }
     // load pin store...
     var Rpc = require(config.rpc);
-    Rpc.create(config, w(function (e, _rpc) {
+    Rpc.create(config, debuggable, w(function (e, _rpc) {
         if (e) {
             w.abort();
             throw e;
@@ -258,3 +276,6 @@ var nt = nThen(function (w) {
     });
 });
 
+if (config.debugReplName) {
+    require('replify')({ name: config.debugReplName, app: debuggableStore });
+}

@@ -31,6 +31,8 @@ define({
     'EV_RT_CONNECT': true,
     // Called after the history is finished synchronizing, no arguments.
     'EV_RT_READY': true,
+    // Called when the server returns an error in a pad (EEXPIRED, EDELETED).
+    'EV_RT_ERROR': true,
     // Called from both outside and inside, argument is a (string) chainpad message.
     'Q_RT_MESSAGE': true,
 
@@ -191,6 +193,7 @@ define({
     'Q_SETTINGS_LOGOUT': true,
     // Import pads from this computer's anon session into the current user account
     'Q_SETTINGS_IMPORT_LOCAL': true,
+    'Q_SETTINGS_DELETE_ACCOUNT': true,
 
     // Store the language selected in the iframe into localStorage outside
     'Q_LANGUAGE_SET': true,
@@ -218,8 +221,13 @@ define({
 
     // Pad creation screen: create a pad with the selected attributes (owned, expire)
     'Q_CREATE_PAD': true,
+    // Get the available templates
+    'Q_CREATE_TEMPLATES': true,
 
     // This is for sending data out of the iframe when we are in testing mode
     // The exact protocol is defined in common/test.js
     'EV_TESTDATA': true,
+
+    // Critical error outside the iframe during loading screen
+    'EV_LOADING_ERROR': true,
 });

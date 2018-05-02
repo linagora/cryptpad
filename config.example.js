@@ -2,7 +2,7 @@
 /*
     globals module
 */
-var domain = ' http://localhost:3000/';
+var domain = 'http://localhost:3000/';
 
 // You can `kill -USR2` the node process and it will write out a heap dump.
 // If your system doesn't support dumping, comment this out and install with
@@ -12,6 +12,10 @@ var domain = ' http://localhost:3000/';
 // to enable this feature, uncomment the line below:
 // require('heapdump');
 
+
+// we prepend a space because every usage expects it
+// requiring admins to preserve it is unnecessarily confusing
+domain = ' ' + domain;
 module.exports = {
 
     // the address you want to bind to, :: means all ipv4 and ipv6 addresses
@@ -126,7 +130,8 @@ module.exports = {
         'about',
         'contact',
         'what-is-cryptpad',
-        'features'
+        'features',
+        'faq'
     ],
 
     /*  Limits, Donations, Subscriptions and Contact
@@ -248,6 +253,14 @@ module.exports = {
      */
     pinPath: './pins',
 
+    /*  Pads that are not 'pinned' by any registered user can be set to expire
+     *  after a configurable number of days of inactivity (default 90 days).
+     *  The value can be changed or set to false to remove expiration.
+     *  Expired pads can then be removed using a cron job calling the
+     *  `delete-inactive.js` script with node
+     */
+    inactiveTime: 90, // days
+
     /*  CryptPad allows logged in users to upload encrypted files. Files/blobs
      *  are stored in a 'blob-store'. Set its location here.
      */
@@ -326,6 +339,14 @@ module.exports = {
     //  '/etc/apache2/ssl/my_certificate_authorities_cert_chain.ca'
     //],
 
+    /* You can get a repl for debugging the server if you want it.
+     * to enable this, specify the debugReplName and then you can
+     * connect to it with `nc -U /tmp/repl/<your name>.sock`
+     * If you run multiple cryptpad servers, you need to use different
+     * repl names.
+     */
+    //debugReplName: "cryptpad",
+
     /*
     * When delegating Identity Management to an external server,
     * You will need to set a custom Logout URL so that when logging
@@ -348,5 +369,4 @@ module.exports = {
      *  email composer allowing to send the pad URL to any OpenPaaS user.
      */
     //openpaasEmailShareUrl: 'http://openpaas.local/unifiedinbox/mailto?uri=',
-
 };

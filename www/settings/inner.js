@@ -14,7 +14,7 @@ define([
 
     '/bower_components/file-saver/FileSaver.min.js',
     'css!/bower_components/bootstrap/dist/css/bootstrap.min.css',
-    'less!/bower_components/components-font-awesome/css/font-awesome.min.css',
+    'css!/bower_components/components-font-awesome/css/font-awesome.min.css',
     'less!/customize/src/less2/main.less',
 ], function (
     $,
@@ -47,7 +47,8 @@ define([
             'cp-settings-logout-everywhere',
             'cp-settings-resettips',
             'cp-settings-thumbnails',
-            'cp-settings-userfeedback'
+            'cp-settings-userfeedback',
+            'cp-settings-delete'
         ],
         'creation': [
             'cp-settings-creation-owned',
@@ -232,16 +233,14 @@ define([
         // Disable
         $('<span>', {'class': 'cp-sidebarlayout-description'})
             .text(Messages.settings_disableThumbnailsDescription).appendTo($div);
-        var $label = $('<label>', { 'for': 'disableThumbnails', 'class': 'noTitle' })
-            .text(Messages.settings_disableThumbnailsAction);
 
         var $ok = $('<span>', {'class': 'fa fa-check', title: Messages.saved});
         var $spinner = $('<span>', {'class': 'fa fa-spinner fa-pulse'});
 
-        var $checkbox = $('<input>', {
-            'type': 'checkbox',
-            id: 'disableThumbnails'
-        }).on('change', function () {
+        var $cbox = $(UI.createCheckbox('disableThumbnails',
+                                   Messages.settings_disableThumbnailsAction,
+                                   false, { label: {class: 'noTitle'} }));
+        var $checkbox = $cbox.find('input').on('change', function () {
             $spinner.show();
             $ok.hide();
             var val = $checkbox.is(':checked') || false;
@@ -251,14 +250,13 @@ define([
             });
         });
 
-        $checkbox.appendTo($div);
-        $label.appendTo($div);
+        $cbox.appendTo($div);
 
-        $ok.hide().appendTo($div);
-        $spinner.hide().appendTo($div);
+        $ok.hide().appendTo($cbox);
+        $spinner.hide().appendTo($cbox);
 
         common.getAttribute(['general', 'disableThumbnails'], function (e, val) {
-            $checkbox[0].checked = val;
+            $checkbox[0].checked = typeof(val) === "undefined" || val;
         });
 
         // Reset
@@ -282,9 +280,6 @@ define([
 
         $('<span>', {'class': 'label'}).text(Messages.settings_userFeedbackTitle).appendTo($div);
 
-        var $label = $('<label>', { 'for': 'cp-settings-userfeedback', 'class': 'noTitle' })
-            .text(Messages.settings_userFeedback);
-
         $('<span>', {'class': 'cp-sidebarlayout-description'})
             .append(Messages.settings_userFeedbackHint1)
             .append(Messages.settings_userFeedbackHint2).appendTo($div);
@@ -292,10 +287,10 @@ define([
         var $ok = $('<span>', {'class': 'fa fa-check', title: Messages.saved});
         var $spinner = $('<span>', {'class': 'fa fa-spinner fa-pulse'});
 
-        var $checkbox = $('<input>', {
-            'type': 'checkbox',
-            id: 'cp-settings-userfeedback'
-        }).on('change', function () {
+        var $cbox = $(UI.createCheckbox('cp-settings-userfeedback',
+                                   Messages.settings_userFeedback,
+                                   false, { label: {class: 'noTitle'} }));
+        var $checkbox = $cbox.find('input').on('change', function () {
             $spinner.show();
             $ok.hide();
             var val = $checkbox.is(':checked') || false;
@@ -305,15 +300,71 @@ define([
             });
         });
 
-        $checkbox.appendTo($div);
-        $label.appendTo($div);
+        $cbox.appendTo($div);
 
-        $ok.hide().appendTo($div);
-        $spinner.hide().appendTo($div);
+        $ok.hide().appendTo($cbox);
+        $spinner.hide().appendTo($cbox);
 
         if (privateData.feedbackAllowed) {
             $checkbox[0].checked = true;
         }
+        return $div;
+    };
+
+    create['delete'] = function () {
+        var $div = $('<div>', { 'class': 'cp-settings-delete cp-sidebarlayout-element'});
+
+        $('<span>', {'class': 'label'}).text(Messages.settings_deleteTitle).appendTo($div);
+
+        $('<span>', {'class': 'cp-sidebarlayout-description'})
+            .append(Messages.settings_deleteHint).appendTo($div);
+
+        var $ok = $('<span>', {'class': 'fa fa-check', title: Messages.saved});
+        var $spinner = $('<span>', {'class': 'fa fa-spinner fa-pulse'});
+
+        var $button = $('<button>', {'id': 'cp-settings-delete', 'class': 'btn btn-danger'})
+            .text(Messages.settings_deleteButton).appendTo($div);
+
+        $button.click(function () {
+            $spinner.show();
+            UI.confirm(Messages.settings_deleteConfirm, function (yes) {
+                if (!yes) { return; }
+                sframeChan.query("Q_SETTINGS_DELETE_ACCOUNT", null, function (err, data) {
+                    // Owned drive
+                    if (data.state === true) {
+                        sframeChan.query('Q_SETTINGS_LOGOUT', null, function () {});
+                        UI.alert(Messages.settings_deleted, function () {
+                            common.gotoURL('/');
+                        });
+                        $ok.show();
+                        $spinner.hide();
+                        return;
+                    }
+                    // Not owned drive
+                    var msg = h('div.cp-app-settings-delete-alert', [
+                        h('p', Messages.settings_deleteModal),
+                        h('pre', JSON.stringify(data, 0, 2))
+                    ]);
+                    UI.alert(msg);
+                    $spinner.hide();
+                });
+            });
+            // TODO
+            /*
+            UI.confirm("Are you sure?", function (yes) {
+                // Logout everywhere
+                // Disconnect other tabs
+                // Remove owned pads
+                // Remove owned drive
+                // Remove pinstore
+                // Alert: "Account deleted", press OK to be redirected to the home page
+                $spinner.hide();
+            });*/
+        });
+
+        $spinner.hide().appendTo($div);
+        $ok.hide().appendTo($div);
+
         return $div;
     };
 
@@ -335,13 +386,13 @@ define([
                 type: 'radio',
                 name: 'cp-creation-owned',
                 value: 1,
+                checked: 'checked'
             }),
             h('label', { 'for': 'cp-creation-owned-true' }, Messages.creation_ownedTrue),
             h('input#cp-creation-owned-false.cp-creation-owned-value', {
                 type: 'radio',
                 name: 'cp-creation-owned',
                 value: 0,
-                checked: 'checked'
             }),
             h('label', { 'for': 'cp-creation-owned-false' }, Messages.creation_ownedFalse),
             h('span.fa.fa-check', {title: Messages.saved}),
@@ -364,8 +415,8 @@ define([
             });
         });
         common.getAttribute(['general', 'creation', 'owned'], function (e, val) {
-            if (val) {
-                $owned.find('#cp-creation-owned-true').attr('checked', true);
+            if (!val && typeof val !== "undefined") {
+                $owned.find('#cp-creation-owned-false').attr('checked', true);
             }
         });
 
@@ -672,30 +723,28 @@ define([
         var $ok = $('<span>', {'class': 'fa fa-check', title: Messages.saved});
         var $spinner = $('<span>', {'class': 'fa fa-spinner fa-pulse'});
 
-        var $label = $('<label>', { 'for': 'cp-settings-padwidth', 'class': 'noTitle' })
-                    .text(Messages.settings_padWidthLabel);
-        var $input = $('<input>', {
-            type: 'checkbox',
-            id: 'cp-settings-padwidth'
-        }).on('change', function () {
+        var $cbox = $(UI.createCheckbox('cp-settings-padwidth',
+                                   Messages.settings_padWidthLabel,
+                                   false, { label: {class: 'noTitle'} }));
+        var $checkbox = $cbox.find('input').on('change', function () {
             $spinner.show();
             $ok.hide();
-            var val = $input.is(':checked');
+            var val = $checkbox.is(':checked');
             common.setAttribute(['pad', 'width'], val, function () {
                 $spinner.hide();
                 $ok.show();
             });
-        }).appendTo($div);
-        $label.appendTo($div);
+        });
+        $cbox.appendTo($div);
 
-        $ok.hide().appendTo($div);
-        $spinner.hide().appendTo($div);
+        $ok.hide().appendTo($cbox);
+        $spinner.hide().appendTo($cbox);
 
 
         common.getAttribute(['pad', 'width'], function (e, val) {
             if (e) { return void console.error(e); }
             if (val) {
-                $input.attr('checked', 'checked');
+                $checkbox.attr('checked', 'checked');
             }
         });
         return $div;
@@ -747,13 +796,14 @@ define([
         }).css('flex-flow', 'column')
         .appendTo($div);
 
-        var $input = $('<input>', {
-            type: 'checkbox',
-        }).on('change', function () {
-            var val = $input.is(':checked');
+
+        var $cbox = $(UI.createCheckbox('cp-settings-codeindent'));
+        var $checkbox = $cbox.find('input').on('change', function () {
+            var val = $checkbox.is(':checked');
             if (typeof(val) !== 'boolean') { return; }
             common.setAttribute(['codemirror', key], val);
-        }).appendTo($inputBlock);
+        });
+        $cbox.appendTo($inputBlock);
 
         /*proxy.on('change', ['settings', 'codemirror', key], function (o, n) {
             $input[0].checked = !!n;
@@ -761,7 +811,7 @@ define([
 
         common.getAttribute(['codemirror', key], function (e, val) {
             if (e) { return void console.error(e); }
-            $input[0].checked = !!val;
+            $checkbox[0].checked = !!val;
         });
         return $div;
     };

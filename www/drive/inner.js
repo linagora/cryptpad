@@ -18,7 +18,7 @@ define([
     '/customize/messages.js',
 
     'css!/bower_components/bootstrap/dist/css/bootstrap.min.css',
-    'less!/bower_components/components-font-awesome/css/font-awesome.min.css',
+    'css!/bower_components/components-font-awesome/css/font-awesome.min.css',
     'less!/customize/src/less2/main.less',
 ], function (
     $,
@@ -41,7 +41,8 @@ define([
 {
     var APP = window.APP = {
         editable: false,
-        mobile: function () { return $('body').width() <= 600; } // Menu and content area are not inline-block anymore for mobiles
+        mobile: function () { return $('body').width() <= 600; }, // Menu and content area are not inline-block anymore for mobiles
+        isMac: navigator.platform === "MacIntel"
     };
 
     var stringify = function (obj) {
@@ -236,7 +237,7 @@ define([
                     'tabindex': '-1',
                     'data-icon': faFolder,
                 }, Messages.fc_newfolder)),
-                h('li', h('a.cp-app-drive-context-hashtag.dropdown-item', {
+                h('li', h('a.cp-app-drive-context-hashtag.dropdown-item.cp-app-drive-context-editable', {
                     'tabindex': '-1',
                     'data-icon': faTags,
                 }, Messages.fc_hashtag)),
@@ -369,7 +370,8 @@ define([
             currentPath = [FILES_DATA];
             $tree.hide();
             if (Object.keys(files.root).length && !proxy.anonymousAlert) {
-                UI.alert(Messages.fm_alert_anonymous, null, true);
+                var msg = common.fixLinks($('<div>').html(Messages.fm_alert_anonymous));
+                UI.alert(msg);
                 proxy.anonymousAlert = true;
             }
         }
@@ -545,6 +547,13 @@ define([
                 $select.each(function (idx, el) {
                     $(el).dblclick();
                 });
+                return;
+            }
+
+            // Ctrl+A select all
+            if (e.which === 65 && (e.ctrlKey || (e.metaKey && APP.isMac))) {
+                $content.find('.cp-app-drive-element:not(.cp-app-drive-element-selected)')
+                    .addClass('cp-app-drive-element-selected');
                 return;
             }
 
@@ -1508,13 +1517,7 @@ define([
             }
             if (!APP.loggedIn) {
                 msg = Messages.fm_info_anonymous;
-                $box.html(msg);
-                $box.find('a[target!="_blank"]').click(function (e) {
-                    e.preventDefault();
-                    var href = $(this).attr('href');
-                    common.gotoURL(href);
-                });
-                return $box;
+                return $(common.fixLinks($box.html(msg)));
             }
             if (!msg || APP.store['hide-info-' + path[0]] === '1') {
                 $box.hide();
@@ -2049,6 +2052,7 @@ define([
                 $element.data('context', 'default');
                 $container.append($element);
             });
+            createGhostIcon($container);
         };
 
         var displayTrashRoot = function ($list, $folderHeader, $fileHeader) {
@@ -2092,7 +2096,7 @@ define([
                     var parsed = Hash.parsePadUrl(href);
                     var $table = $('<table>');
                     var $icon = $('<td>', {'rowspan': '3', 'class': 'cp-app-drive-search-icon'})
-                        .append(getFileIcon(href));
+                        .append(getFileIcon(r.id));
                     var $title = $('<td>', {
                         'class': 'cp-app-drive-search-col1 cp-app-drive-search-title'
                     }).text(r.data.title)
@@ -2232,7 +2236,7 @@ define([
 
             // Only Trash and Root are available in not-owned files manager
             if (!path || displayedCategories.indexOf(path[0]) === -1) {
-                log(Messages.categoryError);
+                log(Messages.fm_categoryError);
                 currentPath = [ROOT];
                 _displayDirectory(currentPath);
                 return;
@@ -2673,11 +2677,14 @@ define([
             var data = JSON.parse(JSON.stringify(filesOp.getFileData(el)));
             if (!data || !data.href) { return void cb('INVALID_FILE'); }
             data.href = base + data.href;
+
+            var roUrl;
             if (ro) {
                 data.roHref = data.href;
                 delete data.href;
             } else {
-                data.roHref = base + getReadOnlyUrl(el);
+                roUrl = getReadOnlyUrl(el);
+                if (roUrl) { data.roHref = base + roUrl; }
             }
 
             UIElements.getProperties(common, data, cb);
@@ -2712,6 +2719,8 @@ define([
             UI.confirm(msgD, function(res) {
                 $(window).focus();
                 if (!res) { return; }
+                filesOp.delete(pathsList, refresh);
+                /*
                 // Try to delete each selected pad from server, and delete from drive if no error
                 var n = nThen(function () {});
                 pathsList.forEach(function (p) {
@@ -2723,10 +2732,12 @@ define([
                         sframeChan.query('Q_REMOVE_OWNED_CHANNEL', channel,
                                          waitFor(function (e) {
                             if (e) { return void console.error(e); }
-                            filesOp.delete([p], refresh);
+                            filesOp.delete([p], function () {}, false, true);
                         }));
                     });
                 });
+                n.nThen(function () { refresh(); });
+                */
             });
         };
         $contextMenu.on("click", "a", function(e) {
@@ -2901,6 +2912,7 @@ define([
                 }
                 // else move to trash
                 moveElements(paths, [TRASH], false, refresh);
+                return;
             }
         });
         var isCharacterKey = function (e) {

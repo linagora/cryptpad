@@ -36,7 +36,7 @@ define([
     '/bower_components/diff-dom/diffDOM.js',
 
     'css!/bower_components/bootstrap/dist/css/bootstrap.min.css',
-    'less!/bower_components/components-font-awesome/css/font-awesome.min.css',
+    'css!/bower_components/components-font-awesome/css/font-awesome.min.css',
     'less!/customize/src/less2/main.less',
 ], function (
     $,
@@ -82,10 +82,52 @@ define([
         Cursor: Cursor,
     };
 
+    // MEDIATAG: Filter elements to serialize
+    // * Remove the drag&drop and resizers from the hyperjson
+    var isWidget = function (el) {
+        return typeof (el.getAttribute) === "function" &&
+                   (el.getAttribute('data-cke-hidden-sel') ||
+                    (el.getAttribute('class') &&
+                        (/cke_widget_drag/.test(el.getAttribute('class')) ||
+                         /cke_image_resizer/.test(el.getAttribute('class')))
+                    )
+                   );
+    };
+
     var isNotMagicLine = function (el) {
         return !(el && typeof(el.getAttribute) === 'function' &&
             el.getAttribute('class') &&
             el.getAttribute('class').split(' ').indexOf('non-realtime') !== -1);
+    };
+
+    var shouldSerialize = function (el) {
+        return isNotMagicLine(el) && !isWidget(el);
+    };
+
+    // MEDIATAG: Filter attributes in the serialized elements
+    var widgetFilter = function (hj) {
+        // Send a widget ID == 0 to avoid a fight between browsers and
+        // prevent the container from having the "selected" class (blue border)
+        if (hj[1].class) {
+            var split = hj[1].class.split(' ');
+            if (split.indexOf('cke_widget_wrapper') !== -1 &&
+                split.indexOf('cke_widget_block') !== -1) {
+                hj[1].class = "cke_widget_wrapper cke_widget_block";
+                hj[1]['data-cke-widget-id'] = "0";
+            }
+            if (split.indexOf('cke_widget_wrapper') !== -1 &&
+                split.indexOf('cke_widget_inline') !== -1) {
+                hj[1].class = "cke_widget_wrapper cke_widget_inline";
+                delete hj[1]['data-cke-widget-id'];
+                //hj[1]['data-cke-widget-id'] = "0";
+            }
+            // Remove the title attribute of the drag&drop icons (translation conflicts)
+            if (split.indexOf('cke_widget_drag_handler')  !== -1 ||
+                split.indexOf('cke_image_resizer') !== -1) {
+                hj[1].title = undefined;
+            }
+        }
+        return hj;
     };
 
     var hjsonFilters = function (hj) {
@@ -100,6 +142,7 @@ define([
         };
         brFilter(hj);
         mediatagContentFilter(hj);
+        widgetFilter(hj);
         return hj;
     };
 
@@ -136,6 +179,14 @@ define([
         check();
     };
 
+    var mkHelpMenu = function (framework) {
+        var $toolbarContainer = $('.cke_toolbox_main');
+        var helpMenu = framework._.sfCommon.createHelpMenu(['text', 'pad']);
+        $toolbarContainer.before(helpMenu.menu);
+
+        framework._.toolbar.$drawer.append(helpMenu.button);
+    };
+
     var mkDiffOptions = function (cursor, readOnly) {
         return {
             preDiffApply: function (info) {
@@ -160,6 +211,36 @@ define([
                         return true;
                     }
                 }
+
+
+                // MEDIATAG
+                // Never modify widget ids
+                if (info.node && info.node.tagName === 'SPAN' && info.diff.name === 'data-cke-widget-id') {
+                    return true;
+                }
+                if (info.node && info.node.tagName === 'SPAN' &&
+                    info.node.getAttribute('class') &&
+                    /cke_widget_wrapper/.test(info.node.getAttribute('class'))) {
+                    if (info.diff.action === 'modifyAttribute' && info.diff.name === 'class') {
+                        return true;
+                    }
+                    //console.log(info);
+                }
+                // CkEditor drag&drop icon container
+                if (info.node && info.node.tagName === 'SPAN' &&
+                        info.node.getAttribute('class') &&
+                        info.node.getAttribute('class').split(' ').indexOf('cke_widget_drag_handler_container') !== -1) {
+                    return true;
+                }
+                // CkEditor drag&drop title (language fight)
+                if (info.node && info.node.getAttribute &&
+                        info.node.getAttribute('class') &&
+                        (info.node.getAttribute('class').split(' ').indexOf('cke_widget_drag_handler') !== -1 ||
+                         info.node.getAttribute('class').split(' ').indexOf('cke_image_resizer') !== -1 ) ) {
+                    return true;
+                }
+
+
                 /*
                     Also reject any elements which would insert any one of
                     our forbidden tag types: script, iframe, object,
@@ -191,20 +272,26 @@ define([
                 if (info.node && info.node.tagName === 'SPAN' &&
                     info.node.getAttribute('contentEditable') === "false") {
                     // it seems to be a magicline plugin element...
+                    // but it can also be a widget (MEDIATAG), in which case the removal was
+                    // probably intentional
+
                     if (info.diff.action === 'removeElement') {
                         // and you're about to remove it...
-                        // this probably isn't what you want
+                        if (!info.node.getAttribute('class') ||
+                            !/cke_widget_wrapper/.test(info.node.getAttribute('class'))) {
+                            // This element is not a widget!
+                            // this probably isn't what you want
+                            /*
+                                I have never seen this in the console, but the
+                                magic line is still getting removed on remote
+                                edits. This suggests that it's getting removed
+                                by something other than diffDom.
+                            */
+                            console.log("preventing removal of the magic line!");
 
-                        /*
-                            I have never seen this in the console, but the
-                            magic line is still getting removed on remote
-                            edits. This suggests that it's getting removed
-                            by something other than diffDom.
-                        */
-                        console.log("preventing removal of the magic line!");
-
-                        // return true to prevent diff application
-                        return true;
+                            // return true to prevent diff application
+                            return true;
+                        }
                     }
                 }
 
@@ -269,12 +356,11 @@ define([
             element: $bar.find('.cke_toolbox_main')
         };
         var onClick = function (visible) {
-            $(window).trigger('resize');
-            $(window).trigger('cryptpad-ck-toolbar');
             framework._.sfCommon.setAttribute(['pad', 'showToolbar'], visible);
         };
         framework._.sfCommon.getAttribute(['pad', 'showToolbar'], function (err, data) {
-            if (typeof(data) === "undefined" || data) { $('.cke_toolbox_main').show(); }
+            if (($(window).height() >= 800  || $(window).width() >= 800) &&
+                (typeof(data) === "undefined" || data)) { $('.cke_toolbox_main').show(); }
             else { $('.cke_toolbox_main').hide(); }
             var $collapse = framework._.sfCommon.createButton('toggle', true, cfg, onClick);
             framework._.toolbar.$rightside.append($collapse);
@@ -315,7 +401,7 @@ define([
             var src = tag.getAttribute('src');
             if (mediaTagMap[src]) {
                 mediaTagMap[src].forEach(function (n) {
-                    tag.appendChild(n);
+                    tag.appendChild(n.cloneNode());
                 });
             }
         });
@@ -324,12 +410,12 @@ define([
     var andThen2 = function (editor, Ckeditor, framework) {
         var mediaTagMap = {};
         var $bar = $('#cke_1_toolbox');
+        var $contentContainer = $('#cke_1_contents');
         var $html = $bar.closest('html');
         var $faLink = $html.find('head link[href*="/bower_components/components-font-awesome/css/font-awesome.min.css"]');
         if ($faLink.length) {
             $html.find('iframe').contents().find('head').append($faLink.clone());
         }
-
         var ml = Ckeditor.instances.editor1.plugins.magicline.backdoor.that.line.$;
         [ml, ml.parentElement].forEach(function (el) {
             el.setAttribute('class', 'non-realtime');
@@ -352,6 +438,8 @@ define([
             }
         };
 
+        mkHelpMenu(framework);
+
         framework.onEditableChange(function (unlocked) {
             if (!framework.isReadOnly()) {
                 $(inner).attr('contenteditable', '' + Boolean(unlocked));
@@ -361,8 +449,11 @@ define([
 
         framework.setMediaTagEmbedder(function ($mt) {
             $mt.attr('contenteditable', 'false');
-            $mt.attr('tabindex', '1');
-            editor.insertElement(new window.CKEDITOR.dom.element($mt[0]));
+            //$mt.attr('tabindex', '1');
+            //MEDIATAG
+            var element = new window.CKEDITOR.dom.element($mt[0]);
+            editor.insertElement(element);
+            editor.widgets.initOn( element, 'mediatag' );
         });
 
         framework.setTitleRecommender(function () {
@@ -394,7 +485,18 @@ define([
 
             var patch = (DD).diff(inner, userDocStateDom);
             (DD).apply(inner, patch);
+
+            // MEDIATAG: Migrate old mediatags to the widget system
+            $(inner).find('media-tag:not(.cke_widget_element)').each(function (i, el) {
+                var element = new window.CKEDITOR.dom.element(el);
+                editor.widgets.initOn( element, 'mediatag' );
+            });
+
             displayMediaTags(framework, inner, mediaTagMap);
+
+            // MEDIATAG: Initialize mediatag widgets inserted in the document by other users
+            editor.widgets.checkWidgets();
+
             if (framework.isReadOnly()) {
                 var $links = $(inner).find('a');
                 // off so that we don't end up with multiple identical handlers
@@ -402,20 +504,33 @@ define([
             }
         });
 
+        framework.setTextContentGetter(function () {
+            var innerCopy = inner.cloneNode(true);
+            displayMediaTags(framework, innerCopy, mediaTagMap);
+            innerCopy.normalize();
+            $(innerCopy).find('*').each(function (i, el) {
+                $(el).append(' ');
+            });
+            var str = $(innerCopy).text();
+            str = str.replace(/\s\s+/g, ' ');
+            return str;
+        });
         framework.setContentGetter(function () {
             displayMediaTags(framework, inner, mediaTagMap);
             inner.normalize();
-            return Hyperjson.fromDOM(inner, isNotMagicLine, hjsonFilters);
+            return Hyperjson.fromDOM(inner, shouldSerialize, hjsonFilters);
         });
 
         $bar.find('#cke_1_toolbar_collapser').hide();
         if (!framework.isReadOnly()) {
-            addToolbarHideBtn(framework, $bar);
+            addToolbarHideBtn(framework, $contentContainer);
         } else {
             $('.cke_toolbox_main').hide();
         }
 
         framework.onReady(function (newPad) {
+            editor.focus();
+
             if (!module.isMaximized) {
                 module.isMaximized = true;
                 $('iframe.cke_wysiwyg_frame').css('width', '');
@@ -423,7 +538,6 @@ define([
             }
             $('body').addClass('app-pad');
 
-            editor.focus();
             if (newPad) {
                 cursor.setToEnd();
             } else if (framework.isReadOnly()) {
@@ -442,7 +556,10 @@ define([
                     var hexFileName = Util.base64ToHex(parsed.hashData.channel);
                     var src = '/blob/' + hexFileName.slice(0,2) + '/' + hexFileName;
                     var mt = '<media-tag contenteditable="false" src="' + src + '" data-crypto-key="cryptpad:' + parsed.hashData.key + '" tabindex="1"></media-tag>';
-                    editor.insertElement(window.CKEDITOR.dom.element.createFromHtml(mt));
+                    // MEDIATAG
+                    var element = window.CKEDITOR.dom.element.createFromHtml(mt);
+                    editor.insertElement(element);
+                    editor.widgets.initOn( element, 'mediatag' );
                 }
             };
             window.APP.FM = framework._.sfCommon.createFileManager(fmConfig);
@@ -453,10 +570,17 @@ define([
                     $iframe.find('html').addClass('cke_body_width');
                 }
             });
+            /*setTimeout(function () {
+                $('iframe.cke_wysiwyg_frame').focus();
+                editor.focus();
+                console.log(editor);
+                console.log(editor.focusManager);
+                $(window).trigger('resize');
+            });*/
         });
 
         framework.onDefaultContentNeeded(function () {
-            documentBody.innerHTML = Messages.initialState;
+            inner.innerHTML = '<p></p>';
         });
 
         var importMediaTags = function (dom, cb) {
@@ -480,6 +604,8 @@ define([
                     Util.blobToImage($(el).data('blob'), waitFor(function (imgSrc) {
                         $clone.find('media-tag[src="' + $(el).attr('src') + '"] img')
                             .attr('src', imgSrc);
+                        $clone.find('media-tag').parent()
+                            .find('.cke_widget_drag_handler_container').remove();
                     }));
                 });
             }).nThen(function () {
@@ -550,9 +676,9 @@ define([
         nThen(function (waitFor) {
             Framework.create({
                 toolbarContainer: '#cke_1_toolbox',
-                contentContainer: '#cke_1_contents',
+                contentContainer: '#cke_editor1 > .cke_inner',
                 patchTransformer: ChainPad.NaiveJSONTransformer,
-                thumbnail: {
+                /*thumbnail: {
                     getContainer: function () { return $('iframe').contents().find('html')[0]; },
                     filter: function (el, before) {
                         if (before) {
@@ -573,7 +699,7 @@ define([
                         var range = module.cursor.makeRange();
                         module.cursor.fixSelection(sel, range);
                     }
-                }
+                }*/
             }, waitFor(function (fw) { window.APP.framework = framework = fw; }));
 
             nThen(function (waitFor) {
@@ -597,9 +723,10 @@ define([
                 var backColor = AppConfig.appBackgroundColor;
                 var newCss = '.cke_body_width { background: '+ backColor +'; height: 100%; }' +
                     '.cke_body_width body {' +
-                        'max-width: 50em; padding: 10px 30px; margin: 0 auto; min-height: 100%;'+
-                        'box-sizing: border-box;'+
-                    '}';
+                        'max-width: 50em; padding: 20px 30px; margin: 0 auto; min-height: 100%;'+
+                        'box-sizing: border-box; overflow: auto;'+
+                    '}' +
+                    '.cke_body_width body > *:first-child { margin-top: 0; }';
                 Ckeditor.addCss(newCss);
                 Ckeditor.plugins.addExternal('mediatag','/pad/', 'mediatag-plugin.js');
                 module.ckeditor = editor = Ckeditor.replace('editor1', {
@@ -613,6 +740,15 @@ define([
                     height: Messages.pad_mediatagHeight
                 };
                 Links.addSupportForOpeningLinksInNewTab(Ckeditor)({editor: editor});
+            }).nThen(function () {
+                // Move ckeditor parts to have a structure like the other apps
+                var $toolbarContainer = $('#cke_1_top');
+                var $contentContainer = $('#cke_1_contents');
+                var $mainContainer = $('#cke_editor1');
+                $contentContainer.prepend($toolbarContainer.find('.cke_toolbox_main'));
+                $mainContainer.prepend($toolbarContainer);
+                $contentContainer.find('.cke_toolbox_main').addClass('cke_reset_all');
+                $toolbarContainer.removeClass('cke_reset_all');
             }).nThen(waitFor());
 
         }).nThen(function (/*waitFor*/) {

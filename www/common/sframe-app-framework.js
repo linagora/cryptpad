@@ -7,6 +7,7 @@ define([
     '/common/sframe-common.js',
     '/customize/messages.js',
     '/common/common-util.js',
+    '/common/common-hash.js',
     '/common/common-interface.js',
     '/common/common-thumbnail.js',
     '/common/common-feedback.js',
@@ -16,7 +17,7 @@ define([
 
     '/bower_components/file-saver/FileSaver.min.js',
     'css!/bower_components/bootstrap/dist/css/bootstrap.min.css',
-    'less!/bower_components/components-font-awesome/css/font-awesome.min.css',
+    'css!/bower_components/components-font-awesome/css/font-awesome.min.css',
     'less!/customize/src/less2/main.less',
 ], function (
     $,
@@ -27,6 +28,7 @@ define([
     SFCommon,
     Messages,
     Util,
+    Hash,
     UI,
     Thumb,
     Feedback,
@@ -41,7 +43,9 @@ define([
     var STATE = Object.freeze({
         DISCONNECTED: 'DISCONNECTED',
         FORGOTTEN: 'FORGOTTEN',
+        DELETED: 'DELETED',
         INFINITE_SPINNER: 'INFINITE_SPINNER',
+        ERROR: 'ERROR',
         INITIALIZING: 'INITIALIZING',
         HISTORY_MODE: 'HISTORY_MODE',
         READY: 'READY'
@@ -84,6 +88,7 @@ define([
             });
         });
 
+        var textContentGetter;
         var titleRecommender = function () { return false; };
         var contentGetter = function () { return UNINITIALIZED; };
         var normalize0 = function (x) { return x; };
@@ -114,10 +119,11 @@ define([
             return;
         };
 
-        var stateChange = function (newState) {
+        var stateChange = function (newState, text) {
             var wasEditable = (state === STATE.READY);
+            if (state === STATE.DELETED || state === STATE.ERROR) { return; }
             if (state === STATE.INFINITE_SPINNER && newState !== STATE.READY) { return; }
-            if (newState === STATE.INFINITE_SPINNER) {
+            if (newState === STATE.INFINITE_SPINNER || newState === STATE.DELETED) {
                 state = newState;
             } else if (state === STATE.DISCONNECTED && newState !== STATE.INITIALIZING) {
                 throw new Error("Cannot transition from DISCONNECTED to " + newState);
@@ -142,8 +148,20 @@ define([
                     evStart.reg(function () { toolbar.failed(); });
                     break;
                 }
+                case STATE.ERROR: {
+                    evStart.reg(function () {
+                        toolbar.errorState(true, text);
+                        var msg = Messages.chainpadError;
+                        UI.errorLoadingScreen(msg, true, true);
+                    });
+                    break;
+                }
                 case STATE.FORGOTTEN: {
                     evStart.reg(function () { toolbar.forgotten(); });
+                    break;
+                }
+                case STATE.DELETED: {
+                    evStart.reg(function () { toolbar.deleted(); });
                     break;
                 }
                 default:
@@ -240,7 +258,12 @@ define([
             }
 
             var contentStr = JSONSortify(content);
-            cpNfInner.chainpad.contentUpdate(contentStr);
+            try {
+                cpNfInner.chainpad.contentUpdate(contentStr);
+            } catch (e) {
+                stateChange(STATE.ERROR, e.message);
+                console.error(e);
+            }
             if (cpNfInner.chainpad.getUserDoc() !== contentStr) {
                 console.error("realtime.getUserDoc() !== shjson");
             }
@@ -254,6 +277,7 @@ define([
 
         var onReady = function () {
             var newContentStr = cpNfInner.chainpad.getUserDoc();
+            if (state === STATE.DELETED) { return; }
 
             var newPad = false;
             if (newContentStr === '') { newPad = true; }
@@ -287,11 +311,17 @@ define([
             UI.removeLoadingScreen(emitResize);
 
             var privateDat = cpNfInner.metadataMgr.getPrivateData();
+            var hash = privateDat.availableHashes.editHash ||
+                       privateDat.availableHashes.viewHash;
+            var href = privateDat.pathname + '#' + hash;
+            if (AppConfig.textAnalyzer && textContentGetter) {
+                var channelId = Hash.hrefToHexChannelId(href);
+                AppConfig.textAnalyzer(textContentGetter, channelId);
+            }
+
             if (options.thumbnail && privateDat.thumbnails) {
-                var hash = privateDat.availableHashes.editHash ||
-                           privateDat.availableHashes.viewHash;
                 if (hash) {
-                    options.thumbnail.href = privateDat.pathname + '#' + hash;
+                    options.thumbnail.href = href;
                     options.thumbnail.getContent = function () {
                         if (!cpNfInner.chainpad) { return; }
                         return cpNfInner.chainpad.getUserDoc();
@@ -307,12 +337,19 @@ define([
             }
         };
         var onConnectionChange = function (info) {
+            if (state === STATE.DELETED) { return; }
             stateChange(info.state ? STATE.INITIALIZING : STATE.DISCONNECTED);
-            if (info.state) {
+            /*if (info.state) {
                 UI.findOKButton().click();
             } else {
                 UI.alert(Messages.common_connectionLost, undefined, true);
-            }
+            }*/
+        };
+
+        var onError = function (err) {
+            common.onServerError(err, toolbar, function () {
+                stateChange(STATE.DELETED);
+            });
         };
 
         var setFileExporter = function (extension, fe, async) {
@@ -375,11 +412,7 @@ define([
                         '" data-crypto-key="cryptpad:' + data.key + '"></media-tag>'), data);
                 }
             });
-            $embedButton = $('<button>', {
-                title: Messages.filePickerButton,
-                'class': 'cp-toolbar-rightside-button fa fa-picture-o',
-                style: 'font-size: 17px'
-            }).click(function () {
+            $embedButton = common.createButton('mediatag', true).click(function () {
                 common.openFilePicker({
                     types: ['file'],
                     where: ['root']
@@ -403,20 +436,14 @@ define([
             common.getSframeChannel().onReady(waitFor());
         }).nThen(function (waitFor) {
             Test.registerInner(common.getSframeChannel());
-            if (!AppConfig.displayCreationScreen) { return; }
-            var priv = common.getMetadataMgr().getPrivateData();
-            if (priv.isNewFile) {
-                var c = (priv.settings.general && priv.settings.general.creation) || {};
-                if (c.skip && !priv.forceCreationScreen) { return void common.createPad(c, waitFor()); }
-                common.getPadCreationScreen(c, waitFor());
-            }
+            common.handleNewFile(waitFor);
         }).nThen(function (waitFor) {
             cpNfInner = common.startRealtime({
                 // really basic operational transform
                 patchTransformer: options.patchTransformer || ChainPad.SmartJSONTransformer,
 
                 // cryptpad debug logging (default is 1)
-                // logLevel: 2,
+                logLevel: 2,
                 validateContent: options.validateContent || function (content) {
                     try {
                         JSON.parse(content);
@@ -432,7 +459,8 @@ define([
                 onLocal: onLocal,
                 onInit: function () { stateChange(STATE.INITIALIZING); },
                 onReady: function () { evStart.reg(onReady); },
-                onConnectionChange: onConnectionChange
+                onConnectionChange: onConnectionChange,
+                onError: onError
             });
 
             var privReady = Util.once(waitFor());
@@ -448,6 +476,8 @@ define([
             var infiniteSpinnerModal = false;
             window.setInterval(function () {
                 if (state === STATE.DISCONNECTED) { return; }
+                if (state === STATE.DELETED) { return; }
+                if (state === STATE.ERROR) { return; }
                 var l;
                 try {
                     l = cpNfInner.chainpad.getLag();
@@ -542,6 +572,9 @@ define([
                 toolbar.$rightside.append($templateButton);
             }
 
+            var $importTemplateButton = common.createButton('importtemplate', true);
+            toolbar.$drawer.append($importTemplateButton);
+
             /* add a forget button */
             toolbar.$rightside.append(common.createButton('forget', true, {}, function (err) {
                 if (err) { return; }
@@ -566,6 +599,10 @@ define([
                 // Set the content supplier, this is the function which will supply the content
                 // in the pad when requested by the framework.
                 setContentGetter: function (cg) { contentGetter = cg; },
+
+                // Set a text content supplier, this is a function which will give a text
+                // representation of the pad content if a text analyzer is configured
+                setTextContentGetter: function (tcg) { textContentGetter = tcg; },
 
                 // Inform the framework that the content of the pad has been changed locally.
                 localChange: onLocal,

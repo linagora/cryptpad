@@ -34,13 +34,14 @@ define([
         var onLocal = config.onLocal || function () { };
         var setMyID = config.setMyID || function () { };
         var onReady = config.onReady || function () { };
+        var onError = config.onError || function () { };
         var userName = config.userName;
         var initialState = config.initialState;
         if (config.transformFunction) { throw new Error("transformFunction is nolonger allowed"); }
         var patchTransformer = config.patchTransformer;
         var validateContent = config.validateContent;
         var avgSyncMilliseconds = config.avgSyncMilliseconds;
-        var logLevel = typeof(config.logLevel) !== 'undefined'? config.logLevel : 2;
+        var logLevel = typeof(config.logLevel) !== 'undefined'? config.logLevel : 1;
         var readOnly = config.readOnly || false;
         var sframeChan = config.sframeChan;
         var metadataMgr = config.metadataMgr;
@@ -82,6 +83,11 @@ define([
             isReady = false;
             chainpad.abort();
             onConnectionChange({ state: false });
+        });
+        sframeChan.on('EV_RT_ERROR', function (err) {
+            isReady = false;
+            chainpad.abort();
+            onError(err);
         });
         sframeChan.on('EV_RT_CONNECT', function (content) {
             //content.members.forEach(userList.onJoin);

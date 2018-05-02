@@ -72,7 +72,7 @@ define([
                     ])
                 ])
             ]),
-            h('div.cp-version-footer', "CryptPad v1.25.0 (Zombie)")
+            h('div.cp-version-footer', "CryptPad v2.0.0 (Alpaca)")
         ]);
     };
 
@@ -92,18 +92,34 @@ define([
             ]);
         }
 
-        return h('nav.navbar.navbar-toggleable-md',
-                     h('button.navbar-toggler.navbar-toggler-right', {'type':'button'}, {'data-toggle':'collapse'}, {'data-target':'#menuCollapse'}, {'aria-controls': 'menuCollapse'}, {'aria-expanded':'false'}, {'aria-label':'Toggle navigation'},
-                    [h('i.fa.fa-bars ')
-                    ]),
-                    h('a.navbar-brand', { href: '/index.html'}),
-                h('div.collapse.navbar-collapse.justify-content-end#menuCollapse', [  
-                    h('a.nav-item.nav-link', { href: '/what-is-cryptpad.html'}, Msg.topbar_whatIsCryptpad),
-                    h('a.nav-item.nav-link', { href: 'https://blog.cryptpad.fr/'}, Msg.blog),
-                    h('a.nav-item.nav-link', { href: '/features.html'}, Msg.features),
-                    h('a.nav-item.nav-link', { href: '/contact.html'}, Msg.contact),
-                    h('a.nav-item.nav-link', { href: '/about.html'}, Msg.about),
-                ].concat(rightLinks))
+        var button = h('button.navbar-toggler', {
+            'type':'button',
+            /*'data-toggle':'collapse',
+            'data-target':'#menuCollapse',
+            'aria-controls': 'menuCollapse',
+            'aria-expanded':'false',
+            'aria-label':'Toggle navigation'*/
+        }, h('i.fa.fa-bars '));
+
+        $(button).click(function () {
+            if ($('#menuCollapse').is(':visible')) {
+                return void $('#menuCollapse').slideUp();
+            }
+            $('#menuCollapse').slideDown();
+        });
+
+        return h('nav.navbar.navbar-expand-lg',
+            h('a.navbar-brand', { href: '/index.html'}),
+            button,
+            h('div.collapse.navbar-collapse.justify-content-end#menuCollapse', [
+                //h('a.nav-item.nav-link', { href: '/what-is-cryptpad.html'}, Msg.topbar_whatIsCryptpad), // Moved the FAQ
+                h('a.nav-item.nav-link', { href: '/faq.html'}, Msg.faq_link),
+                h('a.nav-item.nav-link', { href: 'https://blog.cryptpad.fr/'}, Msg.blog),
+                h('a.nav-item.nav-link', { href: '/features.html'}, Msg.features),
+                h('a.nav-item.nav-link', { href: '/privacy.html'}, Msg.privacy),
+                h('a.nav-item.nav-link', { href: '/contact.html'}, Msg.contact),
+                h('a.nav-item.nav-link', { href: '/about.html'}, Msg.about),
+            ].concat(rightLinks))
         );
     };
 
@@ -142,10 +158,10 @@ define([
                     ]),
                 ]),
                 h('div.row.align-items-center',[
-                    h('div.col-12.col-sm-12.col-md-12.col-lg-6.push-lg-6.cp-bio-avatar.cp-bio-avatar-right', [
+                    h('div.col-12.col-sm-12.col-md-12.col-lg-6.order-2.cp-bio-avatar.cp-bio-avatar-right', [
                             h('img.img-fluid', {'src': '/customize/images/AaronMacSween.jpg'})
                     ]),
-                    h('div.col-12.col-sm-12.col-md-12.col-lg-6.pull-lg-6.cp-profile-det',[
+                    h('div.col-12.col-sm-12.col-md-12.col-lg-6.order-1.cp-profile-det',[
                         h('h3', "Aaron MacSween"),
                         h('hr'),
                         setHTML(h('div#bioAaron'), '<p>Aaron transitioned into distributed systems development from a background in jazz and live stage performance. <br/> He appreciates the elegance of biological systems and functional programming, and focused on both as a student at the University of Toronto, where he studied cognitive and computer sciences.<br/>He moved to Paris in 2015 to work as a research engineer at XWiki SAS, after having dedicated significant time to various cryptography-related software projects.<br/>He spends his spare time experimenting with guitars, photography, science fiction, and spicy food.</p>'),
@@ -193,10 +209,10 @@ define([
                     ]),
                 ]),
                 h('div.row.align-items-center',[
-                    h('div.col-12.col-sm-12.col-md-12.col-lg-6.push-lg-6.cp-bio-avatar.cp-bio-avatar-right', [
+                    h('div.col-12.col-sm-12.col-md-12.col-lg-6.order-2.cp-bio-avatar.cp-bio-avatar-right', [
                             h('img.img-fluid', {'src': '/customize/images/Catalin.jpg'})
                     ]),
-                    h('div.col-12.col-sm-12.col-md-12.col-lg-6.pull-lg-6.cp-profile-det',[
+                    h('div.col-12.col-sm-12.col-md-12.col-lg-6.order-1.cp-profile-det',[
                         h('h3', "Catalin Scripcariu"),
                         h('hr'),
                         setHTML(h('div#bioCatalin'), '<p> Catalin is a Maths majour and has worked in B2B sales for 12 years. Design was always his passion and 3 years ago he started to dedicate himself to web design and front-end.<br/>At the beginning of 2017 he joined the XWiki, where he worked both on the business and the community side of XWiki, including the research team and CryptPad. </p>'),
@@ -350,7 +366,7 @@ define([
             h('div.container.cp-container', [
                 h('center', h('h1', Msg.policy_title)),
                 h('h2', Msg.policy_whatweknow),
-                h('p', Msg.policywhatweknow_p1),
+                setHTML(h('p'), Msg.policy_whatweknow_p1),
 
                 h('h2', Msg.policy_howweuse),
                 h('p', Msg.policy_howweuse_p1),
@@ -368,6 +384,50 @@ define([
                 h('h2', Msg.policy_choices),
                 h('p', Msg.policy_choices_open),
                 setHTML(h('p'), Msg.policy_choices_vpn),
+            ]),
+            infopageFooter()
+        ]);
+    };
+
+    Pages['/faq.html'] = function () {
+        var categories = [];
+        var faq = Msg.faq;
+        Object.keys(faq).forEach(function (c) {
+            var questions = [];
+            Object.keys(faq[c]).forEach(function (q) {
+                var item = faq[c][q];
+                if (typeof item !== "object") { return; }
+                var answer = h('p.cp-faq-questions-a');
+                var hash = c + '-' + q;
+                var question = h('p.cp-faq-questions-q#' + hash);
+                $(question).click(function () {
+                    if ($(answer).is(':visible')) {
+                        return void $(answer).slideUp();
+                    }
+                    $(answer).slideDown();
+                });
+                questions.push(h('div.cp-faq-questions-items', [
+                    setHTML(question, item.q),
+                    setHTML(answer, item.a)
+                ]));
+            });
+            categories.push(h('div.cp-faq-category', [
+                h('h3', faq[c].title),
+                h('div.cp-faq-category-questions', questions)
+            ]));
+        });
+        var hash = window.location.hash;
+        if (hash) {
+            $(categories).find(hash).click();
+        }
+        return h('div#cp-main', [
+            infopageTopbar(),
+            h('div.container.cp-container', [
+                h('center', h('h1', Msg.faq_title)),
+                h('p.cp-faq-header', h('a.nav-item.nav-link', {
+                    href: '/what-is-cryptpad.html'
+                }, Msg.faq_whatis)),
+                h('div.cp-faq-container', categories)
             ]),
             infopageFooter()
         ]);
@@ -458,13 +518,13 @@ define([
                     ]),
                 ]),
                 h('div.row.align-items-center', [
-                    h('div.col-12.col-sm-12.col-md-12.col-lg-6.push-lg-6', [
+                    h('div.col-12.col-sm-12.col-md-12.col-lg-6.order-2', [
                         setHTML(h('h2'), Msg.whatis_zeroknowledge),
                         setHTML(h('p'), Msg.whatis_zeroknowledge_p1),
                         setHTML(h('p'), Msg.whatis_zeroknowledge_p2),
                         setHTML(h('p'), Msg.whatis_zeroknowledge_p3),
                     ]),
-                    h('div.col-12.col-sm-12.col-md-12.col-lg-6.pull-lg-6', [
+                    h('div.col-12.col-sm-12.col-md-12.col-lg-6.order-1', [
                         h('img#zeroknowledge', { src: '/customize/images/zeroknowledge_small.png?' + urlArgs }),
                     ]),
                 ]),
@@ -502,23 +562,87 @@ define([
         return window.location.replace('/drive');
     };
 
-    var loadingScreen = Pages.loadingScreen = function () {
-        return h('div#cp-loading', 
-            h('div.cp-loading-container', [
-                h('img.cp-loading-cryptofist', {
-                    src: '/customize/cryptpad-new-logo-colors-logoonly.png?' + urlArgs
-                }),
-                h('div.cp-loading-spinner-container',
-                    h('span.fa.fa-circle-o-notch.fa-spin.fa-4x.fa-fw')),
-                h('p'),
-            ])
-        );
+    Pages.createCheckbox = function (id, labelTxt, checked, opts) {
+        opts = opts|| {};
+        // Input properties
+        var inputOpts = {
+            type: 'checkbox',
+            id: id
+        };
+        if (checked) { inputOpts.checked = 'checked'; }
+        $.extend(inputOpts, opts.input || {});
+
+        // Label properties
+        var labelOpts = {};
+        $.extend(labelOpts, opts.label || {});
+        if (labelOpts.class) { labelOpts.class += ' cp-checkmark'; }
+
+        // Mark properties
+        var markOpts = { tabindex: 0 };
+        $.extend(markOpts, opts.mark || {});
+
+        var input = h('input', inputOpts);
+        var mark = h('span.cp-checkmark-mark', markOpts);
+        var label = h('span.cp-checkmark-label', labelTxt);
+
+        $(mark).keydown(function (e) {
+            if (e.which === 32) {
+                e.stopPropagation();
+                e.preventDefault();
+                $(input).prop('checked', !$(input).is(':checked'));
+                $(input).change();
+            }
+        });
+
+        $(input).change(function () { $(mark).focus(); });
+
+        return h('label.cp-checkmark', labelOpts, [
+            input,
+            mark,
+            label
+        ]);
     };
 
-    var hiddenLoader = function () {
-        var loader = loadingScreen();
-        loader.style.display = 'none';
-        return loader;
+    Pages.createRadio = function (name, id, labelTxt, checked, opts) {
+        opts = opts|| {};
+        // Input properties
+        var inputOpts = {
+            type: 'radio',
+            id: id,
+            name: name
+        };
+        if (checked) { inputOpts.checked = 'checked'; }
+        $.extend(inputOpts, opts.input || {});
+
+        // Label properties
+        var labelOpts = {};
+        $.extend(labelOpts, opts.label || {});
+        if (labelOpts.class) { labelOpts.class += ' cp-checkmark'; }
+
+        // Mark properties
+        var markOpts = { tabindex: 0 };
+        $.extend(markOpts, opts.mark || {});
+
+        var input = h('input', inputOpts);
+        var mark = h('span.cp-radio-mark', markOpts);
+        var label = h('span.cp-checkmark-label', labelTxt);
+
+        $(mark).keydown(function (e) {
+            if (e.which === 32) {
+                e.stopPropagation();
+                e.preventDefault();
+                $(input).prop('checked', !$(input).is(':checked'));
+                $(input).change();
+            }
+        });
+
+        $(input).change(function () { $(mark).focus(); });
+
+        return h('label.cp-radio', labelOpts, [
+            input,
+            mark,
+            label
+        ]);
     };
 
     Pages['/user/'] = Pages['/user/index.html'] = function () {
@@ -564,27 +688,10 @@ define([
                         placeholder: Msg.login_confirm,
                     }),
                     h('div.checkbox-container', [
-                        h('input#import-recent', {
-                            name: 'import-recent',
-                            type: 'checkbox',
-                            checked: true
-                        }),
-                        // hscript doesn't generate for on label for some
-                        // reason... use jquery as a temporary fallback
-                        setHTML($('<label for="import-recent"></label>')[0], Msg.register_importRecent)
-                        /*h('label', {
-                            'for': 'import-recent',
-                        }, Msg.register_importRecent),*/
+                        Pages.createCheckbox('import-recent', Msg.register_importRecent, true)
                     ]),
                     h('div.checkbox-container', [
-                        h('input#accept-terms', {
-                            name: 'accept-terms',
-                            type: 'checkbox'
-                        }),
-                        setHTML($('<label for="accept-terms"></label>')[0], Msg.register_acceptTerms)
-                        /*setHTML(h('label', {
-                            'for': 'accept-terms',
-                        }), Msg.register_acceptTerms),*/
+                        $(Pages.createCheckbox('accept-terms')).find('.cp-checkmark-label').append(Msg.register_acceptTerms).parent()[0]
                     ]),
                     h('button#register.btn.cp-login-register', Msg.login_register)
                 ])
@@ -599,7 +706,6 @@ define([
             ]),
 
             infopageFooter(),
-            hiddenLoader(),
         ])];
     };
 
@@ -626,17 +732,7 @@ define([
                             placeholder: Msg.login_password,
                         }),
                         h('div.checkbox-container', [
-                            h('input#import-recent', {
-                                name: 'import-recent',
-                                type: 'checkbox',
-                                checked: true
-                            }),
-                            // hscript doesn't generate for on label for some
-                            // reason... use jquery as a temporary fallback
-                            setHTML($('<label for="import-recent"></label>')[0], Msg.register_importRecent)
-                            /*h('label', {
-                                'for': 'import-recent',
-                            }, Msg.register_importRecent),*/
+                            Pages.createCheckbox('import-recent', Msg.register_importRecent, true),
                         ]),
                         h('div.extra', [
                             h('button.login.first.btn', Msg.login_login)
@@ -645,7 +741,6 @@ define([
                 ]),
             ]),
             infopageFooter(),
-            hiddenLoader(),
         ])];
     };
 
@@ -656,10 +751,14 @@ define([
     Pages['/whiteboard/'] = Pages['/whiteboard/index.html'] = function () {
         return [
             appToolbar(),
-            h('div#cp-app-whiteboard-canvas-area', h('canvas#cp-app-whiteboard-canvas', {
-                width: 600,
-                height: 600
-            })),
+            h('div#cp-app-whiteboard-canvas-area',
+                h('div#cp-app-whiteboard-container',
+                    h('canvas#cp-app-whiteboard-canvas', {
+                        width: 600,
+                        height: 600
+                    })
+                )
+            ),
             h('div#cp-app-whiteboard-controls', {
                 style: {
                     display: 'block',
@@ -719,12 +818,6 @@ define([
             appToolbar(),
             h('div#cp-app-poll-content', [
                 h('div#cp-app-poll-form', [
-                    h('div#cp-app-poll-help', [
-                        h('h1', 'CryptPoll'),
-                        setHTML(h('h2'), Msg.poll_subtitle),
-                        h('p', Msg.poll_p_save),
-                        h('p', Msg.poll_p_encryption)
-                    ]),
                     h('div.cp-app-poll-realtime', [
                         h('br'),
                         h('div', [
